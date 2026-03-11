@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import axios from "axios";
+import { API_BASE } from "./config";
 import ProjectCard from "./components/ProjectCard";
 import SearchBar from "./components/SearchBar";
 import DataTable from "datatables.net-dt";
@@ -89,21 +90,21 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
 
       // ── Push ALL fields needed by CustomerProjectModal ──
       customer.projects.push({
-        project_title:          row.project_title,
-        team:                   row.team,
-        amount:                 row.total_amount,
-        invoiced_date:          row.invoiced_date,
+        project_title: row.project_title,
+        team: row.team,
+        amount: row.total_amount,
+        invoiced_date: row.invoiced_date,
 
         // hours fields from the new SQL query
         expected_project_hours: row.expected_project_hours,
-        actual_hours_taken:     row.actual_hours_taken,
-        hours_difference:       row.hours_difference,
-        employee_hours:         row.employee_hours,   // "Alice (12h), Bob (8h)"
+        actual_hours_taken: row.actual_hours_taken,
+        hours_difference: row.hours_difference,
+        employee_hours: row.employee_hours, // "Alice (12h), Bob (8h)"
 
         // people fields (kept for backward-compat)
-        people_working:         peopleWorking,
-        total_people:           parseInt(row.total_people) || 0,
-        raw_people_working:     row.people_working,
+        people_working: peopleWorking,
+        total_people: parseInt(row.total_people) || 0,
+        raw_people_working: row.people_working,
       });
     });
 
@@ -119,14 +120,16 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
   // ── Data fetches ──
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/industrial/customer-retentation")
-      .then((res) => setCustomerRetention(Array.isArray(res.data) ? res.data : []))
+      .get(`${API_BASE}/industrial/customer-retentation`)
+      .then((res) =>
+        setCustomerRetention(Array.isArray(res.data) ? res.data : []),
+      )
       .catch((err) => console.error("Customer retention error:", err));
   }, []);
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/industrial/employee-evolution")
+      .get(`${API_BASE}/industrial/employee-evolution`)
       .then((res) => {
         console.log("TOTAL ROWS:", res.data.length);
         console.log("SAMPLE ROW:", res.data[0]);
@@ -137,54 +140,72 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/industrial/sales-per-month")
+      .get(`${API_BASE}/industrial/sales-per-month`)
       .then((res) => setSalesPerMonth(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Sales per month error:", err));
   }, []);
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/industrial/project-per-month")
-      .then((res) => setProjectsPerMonth(Array.isArray(res.data) ? res.data : []))
+      .get(`${API_BASE}/industrial/project-per-month`)
+      .then((res) =>
+        setProjectsPerMonth(Array.isArray(res.data) ? res.data : []),
+      )
       .catch((err) => console.error("Projects per month error:", err));
   }, []);
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/industrial/client-project")
+      .get(`${API_BASE}/industrial/client-project`)
       .then((res) => setClientProjects(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Client projects error:", err));
   }, []);
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/industrial/purple-closed")
+      .get(`${API_BASE}/industrial/purple-closed`)
       .then((res) => setClosedProjects(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Closed projects error:", err));
   }, []);
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/industrial/joining-date-people")
+      .get(`${API_BASE}/industrial/joining-date-people`)
       .then((res) => setJoinedPeople(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Join projects error:", err));
   }, []);
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/industrial/monthly-total")
+      .get(`${API_BASE}/industrial/monthly-total`)
       .then((res) => {
-        const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-        const formatted = (Array.isArray(res.data) ? res.data : []).map((row, i, arr) => {
-          const [year, month] = row.service_month.split("-");
-          const label = `${monthNames[parseInt(month) - 1]} ${String(year).slice(2)}`;
-          const aud = parseFloat(row.sumTotal) || 0;
-          const window = arr.slice(Math.max(0, i - 2), i + 1);
-          const trend = Math.round(
-            window.reduce((s, w) => s + (parseFloat(w.sumTotal) || 0), 0) / window.length,
-          );
-          return { month: label, aud, trend };
-        });
+        const monthNames = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        const formatted = (Array.isArray(res.data) ? res.data : []).map(
+          (row, i, arr) => {
+            const [year, month] = row.service_month.split("-");
+            const label = `${monthNames[parseInt(month) - 1]} ${String(year).slice(2)}`;
+            const aud = parseFloat(row.sumTotal) || 0;
+            const window = arr.slice(Math.max(0, i - 2), i + 1);
+            const trend = Math.round(
+              window.reduce((s, w) => s + (parseFloat(w.sumTotal) || 0), 0) /
+                window.length,
+            );
+            return { month: label, aud, trend };
+          },
+        );
         setMonthlyTotals(formatted);
       })
       .catch((err) => console.error("Monthly totals error:", err));
@@ -192,7 +213,7 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/industrial/urgency-openproject")
+      .get(`${API_BASE}/industrial/urgency-openproject`)
       .then((res) => setGreenProjects(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Green urgency projects error:", err));
   }, []);
@@ -223,20 +244,27 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
         responsive: true,
         order: [[0, "asc"]],
       });
-      return () => { if (table) table.destroy(); };
+      return () => {
+        if (table) table.destroy();
+      };
     }
   }, [activeTab, employeeEvolution]);
 
   // ── DataTable: customer retention tab ──
   useEffect(() => {
-    if (activeTab === "customer retention" && aggregatedCustomerData.length > 0) {
+    if (
+      activeTab === "customer retention" &&
+      aggregatedCustomerData.length > 0
+    ) {
       const table = new DataTable("#customerTable", {
         destroy: true,
         pageLength: 50,
         responsive: true,
         order: [[0, "asc"]],
       });
-      return () => { if (table) table.destroy(); };
+      return () => {
+        if (table) table.destroy();
+      };
     }
   }, [activeTab, aggregatedCustomerData]);
 
@@ -246,7 +274,7 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
     setLoadingProjects(true);
     try {
       const res = await axios.get(
-        `http://localhost:5000/api/industrial/employee-projects/${emp.user_id}`,
+        `${API_BASE}/industrial/employee-projects/${emp.user_id}`,
       );
       setEmployeeProjects(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
@@ -259,7 +287,20 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
 
   // ── Shared: last 24 months ──
   const last24Months = useMemo(() => {
-    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
     const now = new Date();
     return Array.from({ length: 24 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (23 - i), 1);
@@ -291,16 +332,37 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
       return searchTerm?.trim() !== "" ? matchesSearch : p.p_team === filter;
     });
     const statusData = [
-      { name: "Running",       value: projects.filter((p) => p.urgency === "green").length,                          color: "#10b981" },
-      { name: "Closed",        value: projects.filter((p) => p.urgency === "purple").length,                         color: "#8b5cf6" },
-      { name: "Delayed/Urgent",value: projects.filter((p) => ["red","orange"].includes(p.urgency)).length,           color: "#ef4444" },
-      { name: "Hold",          value: projects.filter((p) => p.urgency === "yellow").length,                         color: "#f59e0b" },
+      {
+        name: "Running",
+        value: projects.filter((p) => p.urgency === "green").length,
+        color: "#10b981",
+      },
+      {
+        name: "Closed",
+        value: projects.filter((p) => p.urgency === "purple").length,
+        color: "#8b5cf6",
+      },
+      {
+        name: "Delayed/Urgent",
+        value: projects.filter((p) => ["red", "orange"].includes(p.urgency))
+          .length,
+        color: "#ef4444",
+      },
+      {
+        name: "Hold",
+        value: projects.filter((p) => p.urgency === "yellow").length,
+        color: "#f59e0b",
+      },
     ];
     const workloadData = filteredForStats
       .map((p) => ({
         fullName: p.project_name,
         name: p.project_name,
-        hours: p.contributors?.reduce((sum, c) => sum + parseFloat(c.total_hours || 0), 0) || 0,
+        hours:
+          p.contributors?.reduce(
+            (sum, c) => sum + parseFloat(c.total_hours || 0),
+            0,
+          ) || 0,
       }))
       .sort((a, b) => b.hours - a.hours)
       .slice(0, 5);
@@ -317,7 +379,9 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
 
   const peopleVsOpenData = useMemo(() => {
     const joinMap = {};
-    joinedPeople.forEach((row) => { joinMap[row.join_month] = parseInt(row.cumulative_joins) || 0; });
+    joinedPeople.forEach((row) => {
+      joinMap[row.join_month] = parseInt(row.cumulative_joins) || 0;
+    });
     const openMap = {};
     greenProjects.forEach((p) => {
       if (!p.start_date) return;
@@ -335,9 +399,13 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
 
   const peopleVsClosedData = useMemo(() => {
     const closedMap = {};
-    closedProjects.forEach((row) => { closedMap[row.close_month] = parseInt(row.total_closed_projects) || 0; });
+    closedProjects.forEach((row) => {
+      closedMap[row.close_month] = parseInt(row.total_closed_projects) || 0;
+    });
     const joinMap = {};
-    joinedPeople.forEach((row) => { joinMap[row.join_month] = parseInt(row.cumulative_joins) || 0; });
+    joinedPeople.forEach((row) => {
+      joinMap[row.join_month] = parseInt(row.cumulative_joins) || 0;
+    });
     return last6MonthsFromJuly2025.map((m) => ({
       month: m.month,
       people: joinMap[m.key] || 0,
@@ -348,7 +416,20 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
   const tinyBarData = useMemo(() => {
     if (!projects.length) return [];
     const monthMap = {};
-    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
     projects.forEach((p) => {
       if (!p.start_date) return;
       const date = new Date(p.start_date);
@@ -356,13 +437,21 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
       const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, "0")}`;
       const label = `${monthNames[date.getMonth()]} ${String(date.getFullYear()).slice(2)}`;
       if (!monthMap[key]) monthMap[key] = { key, month: label, aud: 0 };
-      const spend = p.contributors?.reduce((sum, c) => sum + parseFloat(c.total_hours || 0), 0) || 0;
+      const spend =
+        p.contributors?.reduce(
+          (sum, c) => sum + parseFloat(c.total_hours || 0),
+          0,
+        ) || 0;
       monthMap[key].aud += spend * 150;
     });
-    const sorted = Object.values(monthMap).sort((a, b) => a.key.localeCompare(b.key)).slice(-12);
+    const sorted = Object.values(monthMap)
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .slice(-12);
     return sorted.map((d, i, arr) => {
       const window = arr.slice(Math.max(0, i - 2), i + 1);
-      const trend = Math.round(window.reduce((s, w) => s + w.aud, 0) / window.length);
+      const trend = Math.round(
+        window.reduce((s, w) => s + w.aud, 0) / window.length,
+      );
       return { ...d, trend };
     });
   }, [projects]);
@@ -370,7 +459,9 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
   const avgMonthlySales = useMemo(() => {
     const data = monthlyTotals.length ? monthlyTotals : tinyBarData;
     if (!data.length) return 0;
-    return Math.round(data.reduce((sum, d) => sum + (d.aud || 0), 0) / data.length);
+    return Math.round(
+      data.reduce((sum, d) => sum + (d.aud || 0), 0) / data.length,
+    );
   }, [monthlyTotals, tinyBarData]);
 
   const projectsPerClientData = useMemo(() => {
@@ -378,7 +469,8 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
     const countMap = {};
     clientProjects.forEach((row) => {
       const name = row.customer_name || "Unknown";
-      countMap[name] = (countMap[name] || 0) + (parseInt(row.total_projects) || 0);
+      countMap[name] =
+        (countMap[name] || 0) + (parseInt(row.total_projects) || 0);
     });
     return Object.entries(countMap)
       .map(([name, count]) => ({ name, count }))
@@ -388,28 +480,44 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
 
   const companiesPerMonthData = useMemo(() => {
     const monthMap = {};
-    projectsPerMonth.forEach((row) => { monthMap[row.project_month] = parseInt(row.total_projects) || 0; });
-    const sorted = last24Months.map((m) => ({ month: m.month, companies: monthMap[m.key] || 0 }));
+    projectsPerMonth.forEach((row) => {
+      monthMap[row.project_month] = parseInt(row.total_projects) || 0;
+    });
+    const sorted = last24Months.map((m) => ({
+      month: m.month,
+      companies: monthMap[m.key] || 0,
+    }));
     const vals = sorted.map((d) => d.companies);
     const n = vals.length;
-    const sumX  = vals.reduce((s, _, i) => s + i, 0);
-    const sumY  = vals.reduce((s, v) => s + v, 0);
+    const sumX = vals.reduce((s, _, i) => s + i, 0);
+    const sumY = vals.reduce((s, v) => s + v, 0);
     const sumXY = vals.reduce((s, v, i) => s + i * v, 0);
     const sumX2 = vals.reduce((s, _, i) => s + i * i, 0);
     const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX) || 0;
     const intercept = (sumY - slope * sumX) / n;
-    return sorted.map((d, i) => ({ ...d, trend: parseFloat((intercept + slope * i).toFixed(2)) }));
+    return sorted.map((d, i) => ({
+      ...d,
+      trend: parseFloat((intercept + slope * i).toFixed(2)),
+    }));
   }, [projectsPerMonth, last24Months]);
 
   const salesAndPeopleData = useMemo(() => {
     const salesMap = {};
-    salesPerMonth.forEach((row) => { salesMap[row.invoice_month] = parseFloat(row.total_amount) || 0; });
+    salesPerMonth.forEach((row) => {
+      salesMap[row.invoice_month] = parseFloat(row.total_amount) || 0;
+    });
     const joinMap = {};
-    joinedPeople.forEach((row) => { joinMap[row.join_month] = parseInt(row.cumulative_joins) || 0; });
+    joinedPeople.forEach((row) => {
+      joinMap[row.join_month] = parseInt(row.cumulative_joins) || 0;
+    });
     let lastPeopleValue = 0;
     return last24Months.map((m) => {
       if (joinMap[m.key] !== undefined) lastPeopleValue = joinMap[m.key];
-      return { month: m.month, sales: Math.round(salesMap[m.key] || 0), people: lastPeopleValue };
+      return {
+        month: m.month,
+        sales: Math.round(salesMap[m.key] || 0),
+        people: lastPeopleValue,
+      };
     });
   }, [salesPerMonth, joinedPeople, last24Months]);
 
@@ -442,7 +550,9 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
   const RotatedTick = ({ x, y, payload }) => (
     <g transform={`translate(${x},${y})`}>
       <text
-        x={0} y={0} dy={4}
+        x={0}
+        y={0}
+        dy={4}
         textAnchor="end"
         fill="#94a3b8"
         fontSize={9}
@@ -458,7 +568,9 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-[#f8fafc]">
         <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
-        <p className="text-slate-500 font-bold tracking-tight">Syncing DDEV Analytics...</p>
+        <p className="text-slate-500 font-bold tracking-tight">
+          Syncing DDEV Analytics...
+        </p>
       </div>
     );
 
@@ -467,16 +579,18 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
       <div className="p-6 lg:p-12">
         {/* Tab Bar */}
         <div className="flex gap-2 mb-10">
-          {["project", "finance", "employee", "customer retention"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-6 py-2 rounded-full text-sm font-black uppercase tracking-wide transition
+          {["project", "finance", "employee", "customer retention"].map(
+            (tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-2 rounded-full text-sm font-black uppercase tracking-wide transition
                 ${activeTab === tab ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
-            >
-              {tab === "employee" ? "Employee Evolution" : tab}
-            </button>
-          ))}
+              >
+                {tab === "employee" ? "Employee Evolution" : tab}
+              </button>
+            ),
+          )}
         </div>
 
         {/* ── PROJECT TAB ── */}
@@ -491,10 +605,12 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                   </h3>
                   <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                     <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-4 h-[2px] bg-[#93c5fd] rounded"></span>People
+                      <span className="inline-block w-4 h-[2px] bg-[#93c5fd] rounded"></span>
+                      People
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-4 h-[2px] bg-[#10b981] rounded"></span>Open Projects
+                      <span className="inline-block w-4 h-[2px] bg-[#10b981] rounded"></span>
+                      Open Projects
                     </span>
                   </div>
                 </div>
@@ -502,23 +618,90 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                   Jul 24 – Present
                 </p>
                 <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart data={peopleVsOpenData} margin={{ top: 10, right: 50, left: 10, bottom: 80 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} interval={0} tick={<RotatedTick />} />
-                    <YAxis yAxisId="left" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
-                      tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                      label={{ value: "People", angle: -90, position: "insideLeft", style: { textAnchor: "middle", fill: "#94a3b8", fontSize: 10, fontWeight: 800 } }}
+                  <ComposedChart
+                    data={peopleVsOpenData}
+                    margin={{ top: 10, right: 50, left: 10, bottom: 80 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f1f5f9"
                     />
-                    <YAxis yAxisId="right" orientation="right" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
+                    <XAxis
+                      dataKey="month"
+                      axisLine={false}
+                      tickLine={false}
+                      interval={0}
+                      tick={<RotatedTick />}
+                    />
+                    <YAxis
+                      yAxisId="left"
+                      fontSize={10}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                      tick={{ fill: "#94a3b8", fontWeight: 700 }}
+                      label={{
+                        value: "People",
+                        angle: -90,
+                        position: "insideLeft",
+                        style: {
+                          textAnchor: "middle",
+                          fill: "#94a3b8",
+                          fontSize: 10,
+                          fontWeight: 800,
+                        },
+                      }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      fontSize={10}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
                       tick={{ fill: "#10b981", fontWeight: 700 }}
-                      label={{ value: "Open", angle: 90, position: "insideRight", style: { textAnchor: "middle", fill: "#10b981", fontSize: 10, fontWeight: 800 } }}
+                      label={{
+                        value: "Open",
+                        angle: 90,
+                        position: "insideRight",
+                        style: {
+                          textAnchor: "middle",
+                          fill: "#10b981",
+                          fontSize: 10,
+                          fontWeight: 800,
+                        },
+                      }}
                     />
                     <Tooltip
-                      formatter={(value, name) => [value, name === "people" ? "People" : "Open Projects"]}
-                      contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
+                      formatter={(value, name) => [
+                        value,
+                        name === "people" ? "People" : "Open Projects",
+                      ]}
+                      contentStyle={{
+                        borderRadius: "12px",
+                        border: "none",
+                        boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+                      }}
                     />
-                    <Line yAxisId="left"  type="monotone" dataKey="people"       stroke="#93c5fd" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#3b82f6" }} />
-                    <Line yAxisId="right" type="monotone" dataKey="openProjects" stroke="#10b981" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#10b981" }} />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="people"
+                      stroke="#93c5fd"
+                      strokeWidth={6}
+                      dot={false}
+                      activeDot={{ r: 5, fill: "#3b82f6" }}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="openProjects"
+                      stroke="#10b981"
+                      strokeWidth={6}
+                      dot={false}
+                      activeDot={{ r: 5, fill: "#10b981" }}
+                    />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -531,10 +714,12 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                   </h3>
                   <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                     <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-4 h-[2px] bg-[#93c5fd] rounded"></span>People
+                      <span className="inline-block w-4 h-[2px] bg-[#93c5fd] rounded"></span>
+                      People
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-4 h-[2px] bg-[#8b5cf6] rounded"></span>Closed Projects
+                      <span className="inline-block w-4 h-[2px] bg-[#8b5cf6] rounded"></span>
+                      Closed Projects
                     </span>
                   </div>
                 </div>
@@ -542,23 +727,90 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                   Jul 24 – Present
                 </p>
                 <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart data={peopleVsClosedData} margin={{ top: 10, right: 50, left: 10, bottom: 80 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} interval={0} tick={<RotatedTick />} />
-                    <YAxis yAxisId="left" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
-                      tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                      label={{ value: "People", angle: -90, position: "insideLeft", style: { textAnchor: "middle", fill: "#94a3b8", fontSize: 10, fontWeight: 800 } }}
+                  <ComposedChart
+                    data={peopleVsClosedData}
+                    margin={{ top: 10, right: 50, left: 10, bottom: 80 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f1f5f9"
                     />
-                    <YAxis yAxisId="right" orientation="right" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
+                    <XAxis
+                      dataKey="month"
+                      axisLine={false}
+                      tickLine={false}
+                      interval={0}
+                      tick={<RotatedTick />}
+                    />
+                    <YAxis
+                      yAxisId="left"
+                      fontSize={10}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                      tick={{ fill: "#94a3b8", fontWeight: 700 }}
+                      label={{
+                        value: "People",
+                        angle: -90,
+                        position: "insideLeft",
+                        style: {
+                          textAnchor: "middle",
+                          fill: "#94a3b8",
+                          fontSize: 10,
+                          fontWeight: 800,
+                        },
+                      }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      fontSize={10}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
                       tick={{ fill: "#8b5cf6", fontWeight: 700 }}
-                      label={{ value: "Closed", angle: 90, position: "insideRight", style: { textAnchor: "middle", fill: "#8b5cf6", fontSize: 10, fontWeight: 800 } }}
+                      label={{
+                        value: "Closed",
+                        angle: 90,
+                        position: "insideRight",
+                        style: {
+                          textAnchor: "middle",
+                          fill: "#8b5cf6",
+                          fontSize: 10,
+                          fontWeight: 800,
+                        },
+                      }}
                     />
                     <Tooltip
-                      formatter={(value, name) => [value, name === "people" ? "People" : "Closed Projects"]}
-                      contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
+                      formatter={(value, name) => [
+                        value,
+                        name === "people" ? "People" : "Closed Projects",
+                      ]}
+                      contentStyle={{
+                        borderRadius: "12px",
+                        border: "none",
+                        boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+                      }}
                     />
-                    <Line yAxisId="left"  type="monotone" dataKey="people"         stroke="#93c5fd" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#3b82f6" }} />
-                    <Line yAxisId="right" type="monotone" dataKey="closedProjects" stroke="#8b5cf6" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#8b5cf6" }} />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="people"
+                      stroke="#93c5fd"
+                      strokeWidth={6}
+                      dot={false}
+                      activeDot={{ r: 5, fill: "#3b82f6" }}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="closedProjects"
+                      stroke="#8b5cf6"
+                      strokeWidth={6}
+                      dot={false}
+                      activeDot={{ r: 5, fill: "#8b5cf6" }}
+                    />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -572,21 +824,59 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                     <BarChart3 size={16} /> Projects per Client
                   </h3>
                 </div>
-                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-4">All time</p>
+                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-4">
+                  All time
+                </p>
                 <ResponsiveContainer width="100%" height={320}>
-                  <BarChart data={projectsPerClientData} margin={{ top: 10, right: 20, left: 10, bottom: 100 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} tick={<RotatedTick />} />
-                    <YAxis fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
+                  <BarChart
+                    data={projectsPerClientData}
+                    margin={{ top: 10, right: 20, left: 10, bottom: 100 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f1f5f9"
+                    />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      interval={0}
+                      tick={<RotatedTick />}
+                    />
+                    <YAxis
+                      fontSize={10}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
                       tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                      label={{ value: "Num of project", angle: -90, position: "insideLeft", style: { textAnchor: "middle", fill: "#94a3b8", fontSize: 10, fontWeight: 800 } }}
+                      label={{
+                        value: "Num of project",
+                        angle: -90,
+                        position: "insideLeft",
+                        style: {
+                          textAnchor: "middle",
+                          fill: "#94a3b8",
+                          fontSize: 10,
+                          fontWeight: 800,
+                        },
+                      }}
                     />
                     <Tooltip
                       formatter={(value) => [value, "Projects"]}
-                      contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
+                      contentStyle={{
+                        borderRadius: "12px",
+                        border: "none",
+                        boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+                      }}
                       cursor={{ fill: "#f8fafc" }}
                     />
-                    <Bar dataKey="count" fill="#2c6cd3" radius={[6, 6, 0, 0]} barSize={32} />
+                    <Bar
+                      dataKey="count"
+                      fill="#2c6cd3"
+                      radius={[6, 6, 0, 0]}
+                      barSize={32}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -600,13 +890,22 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                 </h3>
                 <ResponsiveContainer width="100%" height="90%">
                   <PieChart>
-                    <Pie data={stats?.statusData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                    <Pie
+                      data={stats?.statusData}
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
                       {stats?.statusData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
                     <Tooltip />
-                    <Legend iconType="circle" wrapperStyle={{ paddingTop: "20px" }} />
+                    <Legend
+                      iconType="circle"
+                      wrapperStyle={{ paddingTop: "20px" }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -616,12 +915,39 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                   <BarChart3 size={16} /> Effort (Hours)
                 </h3>
                 <ResponsiveContainer width="100%" height="90%">
-                  <BarChart data={stats?.workloadData} layout="vertical" margin={{ left: 40, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                    <XAxis type="number" fontSize={10} axisLine={false} tickLine={false} />
-                    <YAxis dataKey="name" type="category" fontSize={9} axisLine={false} tickLine={false} width={100} />
+                  <BarChart
+                    data={stats?.workloadData}
+                    layout="vertical"
+                    margin={{ left: 40, right: 20 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      horizontal={false}
+                      stroke="#f1f5f9"
+                    />
+                    <XAxis
+                      type="number"
+                      fontSize={10}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      fontSize={9}
+                      axisLine={false}
+                      tickLine={false}
+                      width={100}
+                    />
                     <Tooltip cursor={{ fill: "#f8fafc" }} />
-                    <Bar dataKey="hours" fill="#3b82f6" radius={[0, 4, 4, 0]} onClick={handleBarClick} className="cursor-pointer" barSize={20} />
+                    <Bar
+                      dataKey="hours"
+                      fill="#3b82f6"
+                      radius={[0, 4, 4, 0]}
+                      onClick={handleBarClick}
+                      className="cursor-pointer"
+                      barSize={20}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -631,12 +957,39 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                   <AlertTriangle size={16} /> Staff Concentration
                 </h3>
                 <ResponsiveContainer width="100%" height="90%">
-                  <BarChart data={stats?.concentrationData} layout="vertical" margin={{ left: 40, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                    <XAxis type="number" fontSize={10} axisLine={false} tickLine={false} />
-                    <YAxis dataKey="name" type="category" fontSize={9} axisLine={false} tickLine={false} width={100} />
+                  <BarChart
+                    data={stats?.concentrationData}
+                    layout="vertical"
+                    margin={{ left: 40, right: 20 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      horizontal={false}
+                      stroke="#f1f5f9"
+                    />
+                    <XAxis
+                      type="number"
+                      fontSize={10}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      fontSize={9}
+                      axisLine={false}
+                      tickLine={false}
+                      width={100}
+                    />
                     <Tooltip />
-                    <Bar dataKey="staff" fill="#f59e0b" radius={[0, 4, 4, 0]} onClick={handleBarClick} className="cursor-pointer" barSize={20} />
+                    <Bar
+                      dataKey="staff"
+                      fill="#f59e0b"
+                      radius={[0, 4, 4, 0]}
+                      onClick={handleBarClick}
+                      className="cursor-pointer"
+                      barSize={20}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -647,9 +1000,12 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
               <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <TrendingUp size={16} className="text-blue-500" /> Recently Created
+                    <TrendingUp size={16} className="text-blue-500" /> Recently
+                    Created
                   </h3>
-                  <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-3 py-1 rounded-full">New Entries</span>
+                  <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-3 py-1 rounded-full">
+                    New Entries
+                  </span>
                 </div>
                 <div className="space-y-4">
                   {recentProjects.map((p) => (
@@ -663,11 +1019,17 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                           #{p.project_id}
                         </div>
                         <div>
-                          <p className="text-sm font-black text-slate-800">{p.project_name}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{p.p_team}</p>
+                          <p className="text-sm font-black text-slate-800">
+                            {p.project_name}
+                          </p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                            {p.p_team}
+                          </p>
                         </div>
                       </div>
-                      <p className="text-xs font-bold text-slate-400">{p.start_date}</p>
+                      <p className="text-xs font-bold text-slate-400">
+                        {p.start_date}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -676,9 +1038,12 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
               <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <AlertTriangle size={16} className="text-slate-400" /> Pending Start
+                    <AlertTriangle size={16} className="text-slate-400" />{" "}
+                    Pending Start
                   </h3>
-                  <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-3 py-1 rounded-full">Not Started</span>
+                  <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-3 py-1 rounded-full">
+                    Not Started
+                  </span>
                 </div>
                 <div className="space-y-4">
                   {notStartedProjects.length > 0 ? (
@@ -693,11 +1058,17 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                             #{p.project_id}
                           </div>
                           <div>
-                            <p className="text-sm font-black text-slate-800">{p.project_name}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{p.p_team}</p>
+                            <p className="text-sm font-black text-slate-800">
+                              {p.project_name}
+                            </p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                              {p.p_team}
+                            </p>
                           </div>
                         </div>
-                        <p className="text-xs font-bold text-slate-400">{p.start_date}</p>
+                        <p className="text-xs font-bold text-slate-400">
+                          {p.start_date}
+                        </p>
                       </div>
                     ))
                   ) : (
@@ -712,14 +1083,19 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
             {/* Search + Project Cards */}
             <header className="mb-12 flex flex-col xl:flex-row xl:items-center justify-between gap-8">
               <div>
-                <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">industrial Projects</h1>
+                <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
+                  industrial Projects
+                </h1>
                 {searchTerm && (
                   <p className="text-blue-600 font-bold text-sm mt-2 flex items-center gap-2">
                     <Search size={14} /> Result for: "{searchTerm}"
                   </p>
                 )}
               </div>
-              <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+              <SearchBar
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+              />
             </header>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10">
               {filteredProjects.map((project) => (
@@ -742,25 +1118,67 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                   data={monthlyTotals.length ? monthlyTotals : tinyBarData}
                   margin={{ top: 5, right: 10, left: 10, bottom: 0 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="month" fontSize={10} axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontWeight: 700 }} />
-                  <YAxis fontSize={10} axisLine={false} tickLine={false}
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#f1f5f9"
+                  />
+                  <XAxis
+                    dataKey="month"
+                    fontSize={10}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#94a3b8", fontWeight: 700 }}
+                  />
+                  <YAxis
+                    fontSize={10}
+                    axisLine={false}
+                    tickLine={false}
                     tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
                     tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                    label={{ value: "AUD", angle: -90, position: "insideLeft", style: { textAnchor: "middle", fill: "#94a3b8", fontSize: 11, fontWeight: 800, letterSpacing: "0.08em" } }}
+                    label={{
+                      value: "AUD",
+                      angle: -90,
+                      position: "insideLeft",
+                      style: {
+                        textAnchor: "middle",
+                        fill: "#94a3b8",
+                        fontSize: 11,
+                        fontWeight: 800,
+                        letterSpacing: "0.08em",
+                      },
+                    }}
                   />
                   <Tooltip
-                    formatter={(value, name) => [`$${value.toLocaleString()} AUD`, name === "aud" ? "Spend" : "Trend"]}
-                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
+                    formatter={(value, name) => [
+                      `$${value.toLocaleString()} AUD`,
+                      name === "aud" ? "Spend" : "Trend",
+                    ]}
+                    contentStyle={{
+                      borderRadius: "12px",
+                      border: "none",
+                      boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+                    }}
                     cursor={{ fill: "#f8fafc" }}
                   />
-                  <Bar dataKey="aud" fill="#8884d8" radius={[8, 8, 0, 0]} barSize={28} />
+                  <Bar
+                    dataKey="aud"
+                    fill="#8884d8"
+                    radius={[8, 8, 0, 0]}
+                    barSize={28}
+                  />
                   <ReferenceLine
                     y={avgMonthlySales}
                     stroke="#22c55e"
                     strokeWidth={2}
                     strokeDasharray="6 3"
-                    label={{ value: `Avg $${(avgMonthlySales / 1000).toFixed(1)}k`, position: "insideTopRight", fill: "#22c55e", fontSize: 11, fontWeight: 800 }}
+                    label={{
+                      value: `Avg $${(avgMonthlySales / 1000).toFixed(1)}k`,
+                      position: "insideTopRight",
+                      fill: "#22c55e",
+                      fontSize: 11,
+                      fontWeight: 800,
+                    }}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
@@ -773,20 +1191,60 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                   <TrendingUp size={16} /> Total Company v/s Month
                 </h3>
               </div>
-              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-2">Last 24 months</p>
+              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-2">
+                Last 24 months
+              </p>
               <ResponsiveContainer width="100%" height={280}>
-                <ComposedChart data={companiesPerMonthData} margin={{ top: 10, right: 20, left: 10, bottom: 80 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} interval={0} tick={<RotatedTick />} />
-                  <YAxis fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
+                <ComposedChart
+                  data={companiesPerMonthData}
+                  margin={{ top: 10, right: 20, left: 10, bottom: 80 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#f1f5f9"
+                  />
+                  <XAxis
+                    dataKey="month"
+                    axisLine={false}
+                    tickLine={false}
+                    interval={0}
+                    tick={<RotatedTick />}
+                  />
+                  <YAxis
+                    fontSize={10}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
                     tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                    label={{ value: "projects", angle: -90, position: "insideLeft", style: { textAnchor: "middle", fill: "#94a3b8", fontSize: 10, fontWeight: 800 } }}
+                    label={{
+                      value: "projects",
+                      angle: -90,
+                      position: "insideLeft",
+                      style: {
+                        textAnchor: "middle",
+                        fill: "#94a3b8",
+                        fontSize: 10,
+                        fontWeight: 800,
+                      },
+                    }}
                   />
                   <Tooltip
                     formatter={(value) => [value, "Projects"]}
-                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
+                    contentStyle={{
+                      borderRadius: "12px",
+                      border: "none",
+                      boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+                    }}
                   />
-                  <Line type="monotone" dataKey="companies" stroke="#93c5fd" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#3b82f6" }} />
+                  <Line
+                    type="monotone"
+                    dataKey="companies"
+                    stroke="#93c5fd"
+                    strokeWidth={6}
+                    dot={false}
+                    activeDot={{ r: 5, fill: "#3b82f6" }}
+                  />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -799,36 +1257,107 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                 </h3>
                 <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                   <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-4 h-[2px] bg-[#93c5fd] rounded"></span>Sales (AUD)
+                    <span className="inline-block w-4 h-[2px] bg-[#93c5fd] rounded"></span>
+                    Sales (AUD)
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-4 h-[2px] bg-[#f97316] rounded"></span>People
+                    <span className="inline-block w-4 h-[2px] bg-[#f97316] rounded"></span>
+                    People
                   </span>
                 </div>
               </div>
-              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-2">Last 24 months</p>
+              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-2">
+                Last 24 months
+              </p>
               <ResponsiveContainer width="100%" height={280}>
-                <ComposedChart data={salesAndPeopleData} margin={{ top: 10, right: 50, left: 10, bottom: 80 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} interval={0} tick={<RotatedTick />} />
-                  <YAxis yAxisId="left" fontSize={10} axisLine={false} tickLine={false}
-                    tickFormatter={(v) => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`}
-                    tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                    label={{ value: "Sales", angle: -90, position: "insideLeft", style: { textAnchor: "middle", fill: "#94a3b8", fontSize: 10, fontWeight: 800 } }}
+                <ComposedChart
+                  data={salesAndPeopleData}
+                  margin={{ top: 10, right: 50, left: 10, bottom: 80 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#f1f5f9"
                   />
-                  <YAxis yAxisId="right" orientation="right" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
+                  <XAxis
+                    dataKey="month"
+                    axisLine={false}
+                    tickLine={false}
+                    interval={0}
+                    tick={<RotatedTick />}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    fontSize={10}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) =>
+                      v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`
+                    }
+                    tick={{ fill: "#94a3b8", fontWeight: 700 }}
+                    label={{
+                      value: "Sales",
+                      angle: -90,
+                      position: "insideLeft",
+                      style: {
+                        textAnchor: "middle",
+                        fill: "#94a3b8",
+                        fontSize: 10,
+                        fontWeight: 800,
+                      },
+                    }}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    fontSize={10}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
                     tick={{ fill: "#f97316", fontWeight: 700 }}
-                    label={{ value: "People", angle: 90, position: "insideRight", style: { textAnchor: "middle", fill: "#f97316", fontSize: 10, fontWeight: 800 } }}
+                    label={{
+                      value: "People",
+                      angle: 90,
+                      position: "insideRight",
+                      style: {
+                        textAnchor: "middle",
+                        fill: "#f97316",
+                        fontSize: 10,
+                        fontWeight: 800,
+                      },
+                    }}
                   />
                   <Tooltip
                     formatter={(value, name) => [
-                      name === "sales" ? `$${value.toLocaleString()} AUD` : `${value} people`,
+                      name === "sales"
+                        ? `$${value.toLocaleString()} AUD`
+                        : `${value} people`,
                       name === "sales" ? "Sales" : "People",
                     ]}
-                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
+                    contentStyle={{
+                      borderRadius: "12px",
+                      border: "none",
+                      boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+                    }}
                   />
-                  <Line yAxisId="left"  type="monotone" dataKey="sales"  stroke="#93c5fd" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#3b82f6" }} />
-                  <Line yAxisId="right" type="monotone" dataKey="people" stroke="#f97316" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#f97316" }} />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="sales"
+                    stroke="#93c5fd"
+                    strokeWidth={6}
+                    dot={false}
+                    activeDot={{ r: 5, fill: "#3b82f6" }}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="people"
+                    stroke="#f97316"
+                    strokeWidth={6}
+                    dot={false}
+                    activeDot={{ r: 5, fill: "#f97316" }}
+                  />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -841,16 +1370,27 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
             <table className="w-full border-collapse" id="myTable">
               <thead>
                 <tr className="bg-slate-100 text-slate-600 text-sm uppercase tracking-wide">
-                  <th className="border border-slate-200 px-4 py-2 text-left">Name</th>
-                  <th className="border border-slate-200 px-4 py-2 text-left">Designation</th>
-                  <th className="border border-slate-200 px-4 py-2 text-center">Total Projects</th>
-                  <th className="border border-slate-200 px-4 py-2 text-center">Total Subprojects</th>
+                  <th className="border border-slate-200 px-4 py-2 text-left">
+                    Name
+                  </th>
+                  <th className="border border-slate-200 px-4 py-2 text-left">
+                    Designation
+                  </th>
+                  <th className="border border-slate-200 px-4 py-2 text-center">
+                    Total Projects
+                  </th>
+                  <th className="border border-slate-200 px-4 py-2 text-center">
+                    Total Subprojects
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {employeeEvolution.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="border border-slate-200 px-4 py-8 text-center text-slate-400 italic">
+                    <td
+                      colSpan={4}
+                      className="border border-slate-200 px-4 py-8 text-center text-slate-400 italic"
+                    >
                       No employee data found.
                     </td>
                   </tr>
@@ -861,10 +1401,18 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
                       onClick={() => handleEmployeeClick(emp)}
                       className="cursor-pointer hover:bg-blue-50 transition-colors"
                     >
-                      <td className="border border-slate-200 px-4 py-2">{emp.fullname || "—"}</td>
-                      <td className="border border-slate-200 px-4 py-2">{emp.designation || "—"}</td>
-                      <td className="border border-slate-200 px-4 py-2 text-center">{emp.total_projects_worked ?? 0}</td>
-                      <td className="border border-slate-200 px-4 py-2 text-center">{emp.total_subprojects_worked ?? 0}</td>
+                      <td className="border border-slate-200 px-4 py-2">
+                        {emp.fullname || "—"}
+                      </td>
+                      <td className="border border-slate-200 px-4 py-2">
+                        {emp.designation || "—"}
+                      </td>
+                      <td className="border border-slate-200 px-4 py-2 text-center">
+                        {emp.total_projects_worked ?? 0}
+                      </td>
+                      <td className="border border-slate-200 px-4 py-2 text-center">
+                        {emp.total_subprojects_worked ?? 0}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -879,35 +1427,63 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
             <table className="w-full border-collapse" id="customerTable">
               <thead>
                 <tr className="bg-slate-100 text-slate-600 text-sm uppercase tracking-wide">
-                  <th className="border border-slate-200 px-4 py-2 text-left">Customer Name</th>
-                  <th className="border border-slate-200 px-4 py-2 text-left">Contact</th>
-                  <th className="border border-slate-200 px-4 py-2 text-left">Mail</th>
-                  <th className="border border-slate-200 px-4 py-2 text-center">Total Projects</th>
-                  <th className="border border-slate-200 px-4 py-2 text-center">Total People</th>
-                  <th className="border border-slate-200 px-4 py-2 text-center">Total Amount</th>
+                  <th className="border border-slate-200 px-4 py-2 text-left">
+                    Customer Name
+                  </th>
+                  <th className="border border-slate-200 px-4 py-2 text-left">
+                    Contact
+                  </th>
+                  <th className="border border-slate-200 px-4 py-2 text-left">
+                    Mail
+                  </th>
+                  <th className="border border-slate-200 px-4 py-2 text-center">
+                    Total Projects
+                  </th>
+                  <th className="border border-slate-200 px-4 py-2 text-center">
+                    Total People
+                  </th>
+                  <th className="border border-slate-200 px-4 py-2 text-center">
+                    Total Amount
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {aggregatedCustomerData.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="border border-slate-200 px-4 py-8 text-center text-slate-400 italic">
+                    <td
+                      colSpan={6}
+                      className="border border-slate-200 px-4 py-8 text-center text-slate-400 italic"
+                    >
                       No customer data found.
                     </td>
                   </tr>
                 ) : (
                   aggregatedCustomerData.map((customer, idx) => {
-                    const totalPeople = customer.projects.reduce((sum, p) => sum + (p.total_people || 0), 0);
+                    const totalPeople = customer.projects.reduce(
+                      (sum, p) => sum + (p.total_people || 0),
+                      0,
+                    );
                     return (
                       <tr
                         key={idx}
                         onClick={() => handleCustomerClick(customer)}
                         className="cursor-pointer hover:bg-blue-50 transition-colors"
                       >
-                        <td className="border border-slate-200 px-4 py-2 font-medium">{customer.client_name || "—"}</td>
-                        <td className="border border-slate-200 px-4 py-2">{customer.contact_phone || "—"}</td>
-                        <td className="border border-slate-200 px-4 py-2">{customer.contact_email || "—"}</td>
-                        <td className="border border-slate-200 px-4 py-2 text-center font-bold">{customer.total_projects}</td>
-                        <td className="border border-slate-200 px-4 py-2 text-center font-bold text-purple-600">{totalPeople}</td>
+                        <td className="border border-slate-200 px-4 py-2 font-medium">
+                          {customer.client_name || "—"}
+                        </td>
+                        <td className="border border-slate-200 px-4 py-2">
+                          {customer.contact_phone || "—"}
+                        </td>
+                        <td className="border border-slate-200 px-4 py-2">
+                          {customer.contact_email || "—"}
+                        </td>
+                        <td className="border border-slate-200 px-4 py-2 text-center font-bold">
+                          {customer.total_projects}
+                        </td>
+                        <td className="border border-slate-200 px-4 py-2 text-center font-bold text-purple-600">
+                          {totalPeople}
+                        </td>
                         <td className="border border-slate-200 px-4 py-2 text-center font-bold text-green-600">
                           ${customer.total_amount.toLocaleString()}
                         </td>

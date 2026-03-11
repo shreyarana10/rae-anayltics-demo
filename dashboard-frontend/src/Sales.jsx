@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import SearchBar from "./components/SearchBar";
+import { BASE_URL } from "./config";
 import {
   BarChart,
   Bar,
@@ -606,12 +607,12 @@ export default function Sales({ filter, searchTerm, setSearchTerm }) {
     const fetchBarData = async () => {
       setBarLoading(true);
       try {
-        const BASE = "http://localhost:5000";
+        
         const [penqRes, qsRes, aqRes, cqRes] = await Promise.all([
-          fetch(`${BASE}/api/sales/team-penq?team=${activeTeamTab}`),
-          fetch(`${BASE}/api/sales/team-qs?team=${activeTeamTab}`),
-          fetch(`${BASE}/api/sales/team-aq?team=${activeTeamTab}`),
-          fetch(`${BASE}/api/sales/team-cq?team=${activeTeamTab}`),
+          fetch(`${BASE_URL}/api/sales/team-penq?team=${activeTeamTab}`),
+          fetch(`${BASE_URL}/api/sales/team-qs?team=${activeTeamTab}`),
+          fetch(`${BASE_URL}/api/sales/team-aq?team=${activeTeamTab}`),
+          fetch(`${BASE_URL}/api/sales/team-cq?team=${activeTeamTab}`),
         ]);
 
         if (!penqRes.ok || !qsRes.ok || !aqRes.ok || !cqRes.ok)
@@ -640,12 +641,12 @@ export default function Sales({ filter, searchTerm, setSearchTerm }) {
     const fetchAllStateData = async () => {
       setStateLoading(true);
       try {
-        const BASE = "http://localhost:5000";
+      
         const [penqRes, qsRes, cqRes, aqRes] = await Promise.all([
-          fetch(`${BASE}/api/sales/state-penq?team=${activeTeamTab}`),
-          fetch(`${BASE}/api/sales/state-qs?team=${activeTeamTab}`),
-          fetch(`${BASE}/api/sales/state-cq?team=${activeTeamTab}`),
-          fetch(`${BASE}/api/sales/state-aq?team=${activeTeamTab}`),
+          fetch(`${BASE_URL}/api/sales/state-penq?team=${activeTeamTab}`),
+          fetch(`${BASE_URL}/api/sales/state-qs?team=${activeTeamTab}`),
+          fetch(`${BASE_URL}/api/sales/state-cq?team=${activeTeamTab}`),
+          fetch(`${BASE_URL}/api/sales/state-aq?team=${activeTeamTab}`),
         ]);
 
         const parseRows = async (res) => {
