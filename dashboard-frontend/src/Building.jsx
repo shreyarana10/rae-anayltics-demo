@@ -220,7 +220,7 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/detailed-projects")
+      .get("http://localhost:5000/api/detailed-projects-building")
       .then((res) => {
         setProjects(Array.isArray(res.data) ? res.data : []);
         setLoading(false);
@@ -321,6 +321,11 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
     });
   }, [last24Months]);
 
+
+
+
+
+
   // ── Derived chart data ──
   const stats = useMemo(() => {
     if (!projects.length) return null;
@@ -331,6 +336,8 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
         p.project_id?.toString().includes(searchTerm);
       return searchTerm?.trim() !== "" ? matchesSearch : p.p_team === filter;
     });
+
+
     const statusData = [
       {
         name: "Running",
@@ -354,6 +361,8 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
         color: "#f59e0b",
       },
     ];
+
+
     const workloadData = filteredForStats
       .map((p) => ({
         fullName: p.project_name,
@@ -376,6 +385,12 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
       .slice(0, 5);
     return { statusData, workloadData, concentrationData };
   }, [projects, filter, searchTerm]);
+
+
+
+
+
+
 
   const peopleVsOpenData = useMemo(() => {
     const joinMap = {};

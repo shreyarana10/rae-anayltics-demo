@@ -190,7 +190,7 @@ export default function Business({ filter, searchTerm, setSearchTerm }) {
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/detailed-projects")
+      .get("http://localhost:5000/api/detailed-projects-accounts")
       .then((res) => {
         setProjects(Array.isArray(res.data) ? res.data : []);
         setLoading(false);
@@ -994,7 +994,7 @@ export default function Business({ filter, searchTerm, setSearchTerm }) {
             <header className="mb-12 flex flex-col xl:flex-row xl:items-center justify-between gap-8">
               <div>
                 <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
-                  Building Projects
+                  Account Projects
                 </h1>
                 {searchTerm && (
                   <p className="text-blue-600 font-bold text-sm mt-2 flex items-center gap-2">

@@ -220,7 +220,7 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/detailed-projects")
+      .get("http://localhost:5000/api/detailed-projects-it")
       .then((res) => {
         setProjects(Array.isArray(res.data) ? res.data : []);
         setLoading(false);

@@ -220,7 +220,7 @@ export default function Industrial({ filter, searchTerm, setSearchTerm }) {
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/detailed-projects")
+      .get("http://localhost:5000/api/detailed-projects-industrial")
       .then((res) => {
         setProjects(Array.isArray(res.data) ? res.data : []);
         setLoading(false);

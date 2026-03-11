@@ -83,39 +83,58 @@ app.get("/api/team-projects", async (req, res) => {
   }
 });
 // ... existing imports and DB config
-app.get("/api/detailed-projects", async (req, res) => {
+app.get("/api/detailed-projects-building", async (req, res) => {
   try {
     const [rows] = await db.query(`
-            SELECT 
-                p.*, 
-                p.end_date as estimated_date,
-                p.urgency, -- Pulling the urgency column (e.g., 'purple')
-                (
-                    SELECT JSON_ARRAYAGG(
-                        JSON_OBJECT(
-                            'user_id', u.user_id,
-                            'name', u.fullname,
-                            'pic', COALESCE(u.profile_pic, ''),
-                            'total_hours', sub.total_hours,
-                            'breakouts', (
-                                SELECT JSON_ARRAYAGG(
-                                    JSON_OBJECT('date', date_value, 'hours', working_hours)
+      SELECT 
+    p.*, 
+    p.end_date AS estimated_date,
+    p.urgency,
+
+    (
+        SELECT CONCAT(
+            '[',
+            GROUP_CONCAT(
+                JSON_OBJECT(
+                    'user_id', u.user_id,
+                    'name', u.fullname,
+                    'pic', COALESCE(u.profile_pic, ''),
+                    'total_hours', sub.total_hours,
+                    'breakouts',
+                    (
+                        SELECT CONCAT(
+                            '[',
+                            GROUP_CONCAT(
+                                JSON_OBJECT(
+                                    'date', date_value,
+                                    'hours', working_hours
                                 )
-                                FROM timesheet 
-                                WHERE project_id_timesheet = p.project_id AND user_id = u.user_id
-                            )
+                            ),
+                            ']'
                         )
-                    )
-                    FROM (
-                        SELECT project_id_timesheet, user_id, SUM(working_hours) as total_hours
                         FROM timesheet
-                        GROUP BY project_id_timesheet, user_id
-                    ) sub
-                    JOIN tbl_admin u ON sub.user_id = u.user_id
-                    WHERE sub.project_id_timesheet = p.project_id
-                ) as contributors
-            FROM projects p
-            ORDER BY p.start_date DESC
+                        WHERE project_id_timesheet = p.project_id
+                        AND user_id = u.user_id
+                    )
+                )
+            ),
+            ']'
+        )
+        FROM (
+            SELECT project_id_timesheet, user_id, SUM(working_hours) AS total_hours
+            FROM timesheet
+            GROUP BY project_id_timesheet, user_id
+        ) sub
+        JOIN tbl_admin u ON sub.user_id = u.user_id
+        WHERE sub.project_id_timesheet = p.project_id
+    ) AS contributors
+
+FROM projects p
+
+WHERE LOWER(TRIM(p.p_team)) LIKE '%building%'
+
+ORDER BY p.start_date DESC;
+
         `);
 
     const formattedRows = rows.map((row) => {
@@ -137,6 +156,223 @@ app.get("/api/detailed-projects", async (req, res) => {
   }
 });
 
+app.get("/api/detailed-projects-industrial", async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT 
+    p.*, 
+    p.end_date AS estimated_date,
+    p.urgency,
+
+    (
+        SELECT CONCAT(
+            '[',
+            GROUP_CONCAT(
+                JSON_OBJECT(
+                    'user_id', u.user_id,
+                    'name', u.fullname,
+                    'pic', COALESCE(u.profile_pic, ''),
+                    'total_hours', sub.total_hours,
+                    'breakouts',
+                    (
+                        SELECT CONCAT(
+                            '[',
+                            GROUP_CONCAT(
+                                JSON_OBJECT(
+                                    'date', date_value,
+                                    'hours', working_hours
+                                )
+                            ),
+                            ']'
+                        )
+                        FROM timesheet
+                        WHERE project_id_timesheet = p.project_id
+                        AND user_id = u.user_id
+                    )
+                )
+            ),
+            ']'
+        )
+        FROM (
+            SELECT project_id_timesheet, user_id, SUM(working_hours) AS total_hours
+            FROM timesheet
+            GROUP BY project_id_timesheet, user_id
+        ) sub
+        JOIN tbl_admin u ON sub.user_id = u.user_id
+        WHERE sub.project_id_timesheet = p.project_id
+    ) AS contributors
+
+FROM projects p
+
+WHERE LOWER(TRIM(p.p_team)) LIKE '%Industrial%'
+
+ORDER BY p.start_date DESC;
+
+        `);
+
+    const formattedRows = rows.map((row) => {
+      const cleanEPT = row.EPT
+        ? parseFloat(row.EPT.toString().replace(/[^\d.]/g, ""))
+        : 0;
+      return {
+        ...row,
+        estimated_hours: cleanEPT,
+        contributors:
+          typeof row.contributors === "string"
+            ? JSON.parse(row.contributors)
+            : row.contributors || [],
+      };
+    });
+    res.json(formattedRows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get("/api/detailed-projects-it", async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT 
+    p.*, 
+    p.end_date AS estimated_date,
+    p.urgency,
+
+    (
+        SELECT CONCAT(
+            '[',
+            GROUP_CONCAT(
+                JSON_OBJECT(
+                    'user_id', u.user_id,
+                    'name', u.fullname,
+                    'pic', COALESCE(u.profile_pic, ''),
+                    'total_hours', sub.total_hours,
+                    'breakouts',
+                    (
+                        SELECT CONCAT(
+                            '[',
+                            GROUP_CONCAT(
+                                JSON_OBJECT(
+                                    'date', date_value,
+                                    'hours', working_hours
+                                )
+                            ),
+                            ']'
+                        )
+                        FROM timesheet
+                        WHERE project_id_timesheet = p.project_id
+                        AND user_id = u.user_id
+                    )
+                )
+            ),
+            ']'
+        )
+        FROM (
+            SELECT project_id_timesheet, user_id, SUM(working_hours) AS total_hours
+            FROM timesheet
+            GROUP BY project_id_timesheet, user_id
+        ) sub
+        JOIN tbl_admin u ON sub.user_id = u.user_id
+        WHERE sub.project_id_timesheet = p.project_id
+    ) AS contributors
+
+FROM projects p
+
+WHERE LOWER(TRIM(p.p_team)) LIKE '%it%'
+
+ORDER BY p.start_date DESC;
+
+        `);
+
+    const formattedRows = rows.map((row) => {
+      const cleanEPT = row.EPT
+        ? parseFloat(row.EPT.toString().replace(/[^\d.]/g, ""))
+        : 0;
+      return {
+        ...row,
+        estimated_hours: cleanEPT,
+        contributors:
+          typeof row.contributors === "string"
+            ? JSON.parse(row.contributors)
+            : row.contributors || [],
+      };
+    });
+    res.json(formattedRows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/detailed-projects-accounts", async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT 
+    p.*, 
+    p.end_date AS estimated_date,
+    p.urgency,
+
+    (
+        SELECT CONCAT(
+            '[',
+            GROUP_CONCAT(
+                JSON_OBJECT(
+                    'user_id', u.user_id,
+                    'name', u.fullname,
+                    'pic', COALESCE(u.profile_pic, ''),
+                    'total_hours', sub.total_hours,
+                    'breakouts',
+                    (
+                        SELECT CONCAT(
+                            '[',
+                            GROUP_CONCAT(
+                                JSON_OBJECT(
+                                    'date', date_value,
+                                    'hours', working_hours
+                                )
+                            ),
+                            ']'
+                        )
+                        FROM timesheet
+                        WHERE project_id_timesheet = p.project_id
+                        AND user_id = u.user_id
+                    )
+                )
+            ),
+            ']'
+        )
+        FROM (
+            SELECT project_id_timesheet, user_id, SUM(working_hours) AS total_hours
+            FROM timesheet
+            GROUP BY project_id_timesheet, user_id
+        ) sub
+        JOIN tbl_admin u ON sub.user_id = u.user_id
+        WHERE sub.project_id_timesheet = p.project_id
+    ) AS contributors
+
+FROM projects p
+
+WHERE LOWER(TRIM(p.p_team)) LIKE '%accounts%'
+
+ORDER BY p.start_date DESC;
+
+        `);
+
+    const formattedRows = rows.map((row) => {
+      const cleanEPT = row.EPT
+        ? parseFloat(row.EPT.toString().replace(/[^\d.]/g, ""))
+        : 0;
+      return {
+        ...row,
+        estimated_hours: cleanEPT,
+        contributors:
+          typeof row.contributors === "string"
+            ? JSON.parse(row.contributors)
+            : row.contributors || [],
+      };
+    });
+    res.json(formattedRows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 const PORT = 5000;
 app.listen(PORT, () =>
   console.log(`Backend running on http://localhost:${PORT}`),
