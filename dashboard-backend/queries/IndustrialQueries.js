@@ -165,7 +165,22 @@ SELECT
     c.contact_email,
     p.p_team AS team,
 
-    -- This will create a comma-separated list of unique people
+    -- Expected project time
+    p.EPT AS expected_project_hours,
+
+    -- Actual hours from timesheet
+    IFNULL(SUM(t.working_hours),0) AS actual_hours_taken,
+
+    -- Difference between expected and actual
+    (p.EPT - IFNULL(SUM(t.working_hours),0)) AS hours_difference,
+
+    -- Employee hours
+    GROUP_CONCAT(
+        DISTINCT CONCAT(a.fullname,' (',t.working_hours,'h)')
+        SEPARATOR ', '
+    ) AS employee_hours,
+
+    -- People working from project table
     GROUP_CONCAT(DISTINCT 
         TRIM(
             SUBSTRING_INDEX(SUBSTRING_INDEX(
@@ -175,20 +190,21 @@ SELECT
                     p.assign_to,
                     p.additional_engineers
                 ), ',', numbers.n), ',', -1)
-            )
+        )
         ORDER BY 
-            TRIM(
-                SUBSTRING_INDEX(SUBSTRING_INDEX(
-                    CONCAT_WS(',',
-                        p.project_manager,
-                        p.team_lead,
-                        p.assign_to,
-                        p.additional_engineers
-                    ), ',', numbers.n), ',', -1)
-                )
+        TRIM(
+            SUBSTRING_INDEX(SUBSTRING_INDEX(
+                CONCAT_WS(',',
+                    p.project_manager,
+                    p.team_lead,
+                    p.assign_to,
+                    p.additional_engineers
+                ), ',', numbers.n), ',', -1)
+        )
         SEPARATOR ', '
     ) AS people_working,
 
+    -- Total number of people
     (
         (CASE WHEN p.project_manager IS NOT NULL AND p.project_manager != '' THEN 1 ELSE 0 END) +
         (CASE WHEN p.team_lead IS NOT NULL AND p.team_lead != '' THEN 1 ELSE 0 END) +
@@ -197,7 +213,9 @@ SELECT
     ) AS total_people,
 
     COUNT(DISTINCT p.project_id) AS total_projects,
+
     SUM(f.price) AS total_amount,
+
     MAX(f.date) AS invoiced_date
 
 FROM contacts c
@@ -208,23 +226,32 @@ JOIN projects p
 LEFT JOIN csa_finance_readytobeinvoiced f
     ON p.project_id = f.project_id
 
+LEFT JOIN timesheet t
+    ON p.project_id = t.project_id_timesheet
+
+LEFT JOIN tbl_admin a
+    ON t.user_id = a.user_id
+
 CROSS JOIN (
     SELECT 1 n UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5
     UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10
 ) numbers
 
-WHERE p.p_team LIKE '%it%'
-  AND numbers.n <= (LENGTH(CONCAT_WS(',',
+WHERE p.p_team LIKE '%industrial%'
+AND numbers.n <= (
+    LENGTH(CONCAT_WS(',',
         p.project_manager,
         p.team_lead,
         p.assign_to,
         p.additional_engineers
-    )) - LENGTH(REPLACE(CONCAT_WS(',',
+    )) 
+    - LENGTH(REPLACE(CONCAT_WS(',',
         p.project_manager,
         p.team_lead,
         p.assign_to,
         p.additional_engineers
-    ), ',', '')) + 1)
+    ), ',', '')) + 1
+)
 
 GROUP BY 
     c.customer_name,
@@ -235,7 +262,8 @@ GROUP BY
     p.project_manager,
     p.team_lead,
     p.assign_to,
-    p.additional_engineers
+    p.additional_engineers,
+    p.EPT
 
 ORDER BY c.customer_name;
 `;

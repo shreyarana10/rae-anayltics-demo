@@ -28,6 +28,9 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import EmployeeProjectModal from "./components/EmployeeProjectModal";
+// ── NEW: import the extracted modal component ──
+import CustomerProjectModal from "./components/CustomerProjectModal";
+
 export default function IT({ filter, searchTerm, setSearchTerm }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,15 +44,13 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
   const [salesPerMonth, setSalesPerMonth] = useState([]);
   const [employeeEvolution, setEmployeeEvolution] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [projectSubproject, setProjectSubproject] = useState([]);
   const [employeeProjects, setEmployeeProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [customerRetention, setCustomerRetention] = useState([]);
-
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerProjects, setCustomerProjects] = useState([]);
-  const [loadingCustomerProjects, setLoadingCustomerProjects] = useState(false);
 
+  // ── Process customer data: one row per customer, projects[] per customer ──
   const aggregatedCustomerData = useMemo(() => {
     const customerMap = new Map();
 
@@ -71,126 +72,58 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
       customer.total_projects += 1;
       customer.total_amount += parseFloat(row.total_amount) || 0;
 
-      // Process people_working - handle if it's a string that looks like an array
+      // Normalise people_working (may arrive as a JSON-array string)
       let peopleWorking = row.people_working || "—";
-
-      // Check if it's a string representation of an array like ["212", "159"]
       if (
         typeof peopleWorking === "string" &&
         peopleWorking.startsWith("[") &&
         peopleWorking.endsWith("]")
       ) {
         try {
-          // Try to parse it as JSON
           const parsed = JSON.parse(peopleWorking);
-          if (Array.isArray(parsed)) {
-            peopleWorking = parsed.join(", ");
-          }
+          if (Array.isArray(parsed)) peopleWorking = parsed.join(", ");
         } catch (e) {
-          // If parsing fails, keep as is
           console.log("Failed to parse people_working:", peopleWorking);
         }
       }
 
+      // ── Push ALL fields needed by CustomerProjectModal ──
       customer.projects.push({
-        project_title: row.project_title,
-        amount: row.total_amount,
-        invoiced_date: row.invoiced_date,
-        people_working: peopleWorking, // Store the formatted string
-        total_people: parseInt(row.total_people) || 0, // Add total people count
-        team: row.team, // Add team info if needed
-        // Also store the raw data for the modal
-        raw_people_working: row.people_working,
+        project_title:          row.project_title,
+        team:                   row.team,
+        amount:                 row.total_amount,
+        invoiced_date:          row.invoiced_date,
+
+        // hours fields from the new SQL query
+        expected_project_hours: row.expected_project_hours,
+        actual_hours_taken:     row.actual_hours_taken,
+        hours_difference:       row.hours_difference,
+        employee_hours:         row.employee_hours,   // "Alice (12h), Bob (8h)"
+
+        // people fields (kept for backward-compat)
+        people_working:         peopleWorking,
+        total_people:           parseInt(row.total_people) || 0,
+        raw_people_working:     row.people_working,
       });
     });
 
     return Array.from(customerMap.values());
   }, [customerRetention]);
 
-  // Add this function in your component
-  const formatPeopleDisplay = (peopleWorking) => {
-    if (!peopleWorking || peopleWorking === "—") return "—";
-
-    // Check if it's a string representation of an array
-    if (
-      typeof peopleWorking === "string" &&
-      peopleWorking.startsWith("[") &&
-      peopleWorking.endsWith("]")
-    ) {
-      try {
-        const parsed = JSON.parse(peopleWorking);
-        if (Array.isArray(parsed)) {
-          if (parsed.length === 0) return "—";
-          if (parsed.length === 1) return parsed[0];
-          if (parsed.length === 2) return `${parsed[0]}, ${parsed[1]}`;
-          return `${parsed[0]}, ${parsed[1]} +${parsed.length - 2}`;
-        }
-      } catch (e) {
-        return peopleWorking;
-      }
-    }
-
-    // If it's a comma-separated string
-    if (typeof peopleWorking === "string" && peopleWorking.includes(",")) {
-      const names = peopleWorking.split(",").map((name) => name.trim());
-      if (names.length === 0) return "—";
-      if (names.length === 1) return names[0];
-      if (names.length === 2) return `${names[0]}, ${names[1]}`;
-      return `${names[0]}, ${names[1]} +${names.length - 2}`;
-    }
-
-    return peopleWorking;
-  };
-
-  // Also add a function to get all names for tooltip/modal
-  const getAllPeopleNames = (peopleWorking) => {
-    if (!peopleWorking || peopleWorking === "—") return [];
-
-    if (
-      typeof peopleWorking === "string" &&
-      peopleWorking.startsWith("[") &&
-      peopleWorking.endsWith("]")
-    ) {
-      try {
-        const parsed = JSON.parse(peopleWorking);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch (e) {
-        return [];
-      }
-    }
-
-    if (typeof peopleWorking === "string" && peopleWorking.includes(",")) {
-      return peopleWorking.split(",").map((name) => name.trim());
-    }
-
-    return peopleWorking ? [peopleWorking] : [];
-  };
-
-  // Handle customer row click
-  const handleCustomerClick = useCallback(async (customer) => {
+  // ── Handle customer row click ──
+  const handleCustomerClick = useCallback((customer) => {
     setSelectedCustomer(customer);
     setCustomerProjects(customer.projects || []);
   }, []);
+
+  // ── Data fetches ──
   useEffect(() => {
     axios
       .get("http://localhost:5000/api/it/customer-retentation")
-      .then((res) => {
-        setCustomerRetention(Array.isArray(res.data) ? res.data : []);
-      })
+      .then((res) => setCustomerRetention(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Customer retention error:", err));
   }, []);
 
-  // ── Fetch project-subproject data ──
-  // useEffect(() => {
-  //   axios
-  //     .get("http://localhost:5000/api/it/project-subproject-data")
-  //     .then((res) => {
-  //       setProjectSubproject(Array.isArray(res.data) ? res.data : []);
-  //     })
-  //     .catch((err) => console.error("Projzect subproject error:", err));
-  // }, []);
-
-  // ── Fetch employee evolution ──
   useEffect(() => {
     axios
       .get("http://localhost:5000/api/it/employee-evolution")
@@ -202,65 +135,38 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
       .catch((err) => console.error("Employee evolution error:", err));
   }, []);
 
-  // ── Initialize DataTable when employee tab is active ──
-  useEffect(() => {
-    if (activeTab === "employee" && employeeEvolution.length > 0) {
-      const table = new DataTable("#myTable", {
-        destroy: true,
-        pageLength: 50,
-        responsive: true,
-        order: [[0, "asc"]],
-      });
-      return () => {
-        if (table) {
-          table.destroy();
-        }
-      };
-    }
-  }, [activeTab, employeeEvolution]);
-
   useEffect(() => {
     axios
       .get("http://localhost:5000/api/it/sales-per-month")
-      .then((res) => {
-        setSalesPerMonth(Array.isArray(res.data) ? res.data : []);
-      })
+      .then((res) => setSalesPerMonth(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Sales per month error:", err));
   }, []);
 
   useEffect(() => {
     axios
       .get("http://localhost:5000/api/it/project-per-month")
-      .then((res) => {
-        setProjectsPerMonth(Array.isArray(res.data) ? res.data : []);
-      })
+      .then((res) => setProjectsPerMonth(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Projects per month error:", err));
   }, []);
 
   useEffect(() => {
     axios
       .get("http://localhost:5000/api/it/client-project")
-      .then((res) => {
-        setClientProjects(Array.isArray(res.data) ? res.data : []);
-      })
+      .then((res) => setClientProjects(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Client projects error:", err));
   }, []);
 
   useEffect(() => {
     axios
       .get("http://localhost:5000/api/it/purple-closed")
-      .then((res) => {
-        setClosedProjects(Array.isArray(res.data) ? res.data : []);
-      })
+      .then((res) => setClosedProjects(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Closed projects error:", err));
   }, []);
 
   useEffect(() => {
     axios
       .get("http://localhost:5000/api/it/joining-date-people")
-      .then((res) => {
-        setJoinedPeople(Array.isArray(res.data) ? res.data : []);
-      })
+      .then((res) => setJoinedPeople(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Join projects error:", err));
   }, []);
 
@@ -268,33 +174,17 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
     axios
       .get("http://localhost:5000/api/it/monthly-total")
       .then((res) => {
-        const monthNames = [
-          "Jan",
-          "Feb",
-          "Mar",
-          "Apr",
-          "May",
-          "Jun",
-          "Jul",
-          "Aug",
-          "Sep",
-          "Oct",
-          "Nov",
-          "Dec",
-        ];
-        const formatted = (Array.isArray(res.data) ? res.data : []).map(
-          (row, i, arr) => {
-            const [year, month] = row.service_month.split("-");
-            const label = `${monthNames[parseInt(month) - 1]} ${String(year).slice(2)}`;
-            const aud = parseFloat(row.sumTotal) || 0;
-            const window = arr.slice(Math.max(0, i - 2), i + 1);
-            const trend = Math.round(
-              window.reduce((s, w) => s + (parseFloat(w.sumTotal) || 0), 0) /
-                window.length,
-            );
-            return { month: label, aud, trend };
-          },
-        );
+        const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const formatted = (Array.isArray(res.data) ? res.data : []).map((row, i, arr) => {
+          const [year, month] = row.service_month.split("-");
+          const label = `${monthNames[parseInt(month) - 1]} ${String(year).slice(2)}`;
+          const aud = parseFloat(row.sumTotal) || 0;
+          const window = arr.slice(Math.max(0, i - 2), i + 1);
+          const trend = Math.round(
+            window.reduce((s, w) => s + (parseFloat(w.sumTotal) || 0), 0) / window.length,
+          );
+          return { month: label, aud, trend };
+        });
         setMonthlyTotals(formatted);
       })
       .catch((err) => console.error("Monthly totals error:", err));
@@ -303,26 +193,9 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
   useEffect(() => {
     axios
       .get("http://localhost:5000/api/it/urgency-openproject")
-      .then((res) => {
-        setGreenProjects(Array.isArray(res.data) ? res.data : []);
-      })
+      .then((res) => setGreenProjects(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Green urgency projects error:", err));
   }, []);
-
-  // ── Projects per Client ──
-  const projectsPerClientData = useMemo(() => {
-    if (!clientProjects.length) return [];
-    const countMap = {};
-    clientProjects.forEach((row) => {
-      const name = row.customer_name || "Unknown";
-      countMap[name] =
-        (countMap[name] || 0) + (parseInt(row.total_projects) || 0);
-    });
-    return Object.entries(countMap)
-      .map(([name, count]) => ({ name, count }))
-      .filter(({ count }) => count > 3)
-      .sort((a, b) => a.count - b.count);
-  }, [clientProjects]);
 
   useEffect(() => {
     axios
@@ -341,263 +214,36 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
     localStorage.setItem("csarae_search", searchTerm);
   }, [searchTerm]);
 
-  // ── Initialize DataTable when customer retention tab is active ──
+  // ── DataTable: employee tab ──
   useEffect(() => {
-    if (
-      activeTab === "customer retention" &&
-      aggregatedCustomerData.length > 0
-    ) {
+    if (activeTab === "employee" && employeeEvolution.length > 0) {
+      const table = new DataTable("#myTable", {
+        destroy: true,
+        pageLength: 50,
+        responsive: true,
+        order: [[0, "asc"]],
+      });
+      return () => { if (table) table.destroy(); };
+    }
+  }, [activeTab, employeeEvolution]);
+
+  // ── DataTable: customer retention tab ──
+  useEffect(() => {
+    if (activeTab === "customer retention" && aggregatedCustomerData.length > 0) {
       const table = new DataTable("#customerTable", {
         destroy: true,
         pageLength: 50,
         responsive: true,
         order: [[0, "asc"]],
       });
-      return () => {
-        if (table) {
-          table.destroy();
-        }
-      };
+      return () => { if (table) table.destroy(); };
     }
   }, [activeTab, aggregatedCustomerData]);
 
-  // Customer Project Modal Component
-  const CustomerProjectModal = ({
-    selectedCustomer,
-    customerProjects,
-    setSelectedCustomer,
-  }) => {
-    if (!selectedCustomer) return null;
-
-    const totalAmount = customerProjects.reduce(
-      (sum, project) => sum + (parseFloat(project.amount) || 0),
-      0,
-    );
-
-    const totalPeopleAcrossProjects = customerProjects.reduce(
-      (sum, project) => sum + (project.total_people || 0),
-      0,
-    );
-
-    // Function to get all people names from a project
-    const getAllPeopleFromProject = (project) => {
-      if (project.raw_people_working) {
-        if (
-          typeof project.raw_people_working === "string" &&
-          project.raw_people_working.startsWith("[") &&
-          project.raw_people_working.endsWith("]")
-        ) {
-          try {
-            const parsed = JSON.parse(project.raw_people_working);
-            return Array.isArray(parsed) ? parsed : [];
-          } catch (e) {
-            return [];
-          }
-        }
-      }
-
-      if (project.people_working && project.people_working !== "—") {
-        return project.people_working.split(",").map((name) => name.trim());
-      }
-
-      return [];
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-3xl max-w-6xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
-          {/* Header */}
-          <div className="bg-slate-50 px-8 py-6 border-b border-slate-200">
-            <div className="flex justify-between items-start">
-              <div>
-                <h2 className="text-2xl font-black text-slate-800 mb-2">
-                  {selectedCustomer.client_name || "Customer"} Projects
-                </h2>
-                <div className="flex flex-wrap items-center gap-6 text-sm">
-                  {selectedCustomer.contact_phone && (
-                    <p className="text-slate-600">
-                      <span className="font-bold text-slate-400">Phone:</span>{" "}
-                      {selectedCustomer.contact_phone}
-                    </p>
-                  )}
-                  {selectedCustomer.contact_email && (
-                    <p className="text-slate-600">
-                      <span className="font-bold text-slate-400">Email:</span>{" "}
-                      {selectedCustomer.contact_email}
-                    </p>
-                  )}
-                  <p className="text-blue-600 font-bold">
-                    Total Projects: {customerProjects.length}
-                  </p>
-                  <p className="text-green-600 font-bold">
-                    Total Amount: ${totalAmount.toLocaleString()}
-                  </p>
-                  <p className="text-purple-600 font-bold">
-                    Total People: {totalPeopleAcrossProjects}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedCustomer(null)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Projects Table */}
-          <div className="p-8 overflow-y-auto max-h-[calc(80vh-120px)]">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-slate-100 text-slate-600 text-sm uppercase tracking-wide">
-                  <th className="border border-slate-200 px-4 py-3 text-left">
-                    Project Title
-                  </th>
-                  <th className="border border-slate-200 px-4 py-3 text-center">
-                    People Working
-                  </th>
-                  <th className="border border-slate-200 px-4 py-3 text-center">
-                    Total People
-                  </th>
-                  <th className="border border-slate-200 px-4 py-3 text-center">
-                    Amount
-                  </th>
-                  <th className="border border-slate-200 px-4 py-3 text-center">
-                    Invoiced Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {customerProjects.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="border border-slate-200 px-4 py-8 text-center text-slate-400 italic"
-                    >
-                      No projects found for this customer.
-                    </td>
-                  </tr>
-                ) : (
-                  customerProjects.map((project, idx) => {
-                    const allPeople = getAllPeopleFromProject(project);
-
-                    return (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="border border-slate-200 px-4 py-3 font-medium">
-                          {project.project_title || "—"}
-                        </td>
-                        <td className="border border-slate-200 px-4 py-3">
-                          <div className="relative group">
-                            <span className="cursor-help border-b border-dotted border-slate-300">
-                              {allPeople.length === 0 && "—"}
-                              {allPeople.length === 1 && allPeople[0]}
-                              {allPeople.length === 2 &&
-                                `${allPeople[0]}, ${allPeople[1]}`}
-                              {allPeople.length > 2 &&
-                                `${allPeople[0]}, ${allPeople[1]} +${allPeople.length - 2}`}
-                            </span>
-                            {/* Tooltip showing all names */}
-                            {allPeople.length > 2 && (
-                              <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-slate-800 text-white text-xs rounded-lg p-2 min-w-[200px] z-10">
-                                <div className="font-bold mb-1">
-                                  All team members:
-                                </div>
-                                {allPeople.map((name, i) => (
-                                  <div key={i} className="py-0.5">
-                                    {name}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="border border-slate-200 px-4 py-3 text-center font-semibold">
-                          {project.total_people || 0}
-                        </td>
-                        <td className="border border-slate-200 px-4 py-3 text-center">
-                          {project.amount
-                            ? `$${parseFloat(project.amount).toLocaleString()}`
-                            : "—"}
-                        </td>
-                        <td className="border border-slate-200 px-4 py-3 text-center">
-                          {project.invoiced_date
-                            ? new Date(
-                                project.invoiced_date,
-                              ).toLocaleDateString("en-US", {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                              })
-                            : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-
-            {/* Summary Cards */}
-            {customerProjects.length > 0 && (
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 rounded-xl p-4">
-                  <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">
-                    Average People per Project
-                  </p>
-                  <p className="text-2xl font-black text-blue-800">
-                    {(
-                      totalPeopleAcrossProjects / customerProjects.length
-                    ).toFixed(1)}
-                  </p>
-                </div>
-                <div className="bg-green-50 rounded-xl p-4">
-                  <p className="text-xs font-bold text-green-600 uppercase tracking-wider">
-                    Average Amount per Project
-                  </p>
-                  <p className="text-2xl font-black text-green-800">
-                    $
-                    {(totalAmount / customerProjects.length).toLocaleString(
-                      undefined,
-                      { maximumFractionDigits: 0 },
-                    )}
-                  </p>
-                </div>
-                <div className="bg-purple-50 rounded-xl p-4">
-                  <p className="text-xs font-bold text-purple-600 uppercase tracking-wider">
-                    Most People on a Project
-                  </p>
-                  <p className="text-2xl font-black text-purple-800">
-                    {Math.max(
-                      ...customerProjects.map((p) => p.total_people || 0),
-                    )}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ── FIX: handleEmployeeClick fetches projects for the modal ──
+  // ── Employee modal click handler ──
   const handleEmployeeClick = useCallback(async (emp) => {
     setSelectedEmployee(emp);
-    setLoadingProjects(true); // show spinner
-
+    setLoadingProjects(true);
     try {
       const res = await axios.get(
         `http://localhost:5000/api/it/employee-projects/${emp.user_id}`,
@@ -610,22 +256,10 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
       setLoadingProjects(false);
     }
   }, []);
-  // ── Shared helper: build last 24 months ──
+
+  // ── Shared: last 24 months ──
   const last24Months = useMemo(() => {
-    const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
+    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const now = new Date();
     return Array.from({ length: 24 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (23 - i), 1);
@@ -646,6 +280,7 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
     });
   }, [last24Months]);
 
+  // ── Derived chart data ──
   const stats = useMemo(() => {
     if (!projects.length) return null;
     const filteredForStats = projects.filter((p) => {
@@ -656,37 +291,16 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
       return searchTerm?.trim() !== "" ? matchesSearch : p.p_team === filter;
     });
     const statusData = [
-      {
-        name: "Running",
-        value: projects.filter((p) => p.urgency === "green").length,
-        color: "#10b981",
-      },
-      {
-        name: "Closed",
-        value: projects.filter((p) => p.urgency === "purple").length,
-        color: "#8b5cf6",
-      },
-      {
-        name: "Delayed/Urgent",
-        value: projects.filter((p) => ["red", "orange"].includes(p.urgency))
-          .length,
-        color: "#ef4444",
-      },
-      {
-        name: "Hold",
-        value: projects.filter((p) => p.urgency === "yellow").length,
-        color: "#f59e0b",
-      },
+      { name: "Running",       value: projects.filter((p) => p.urgency === "green").length,                          color: "#10b981" },
+      { name: "Closed",        value: projects.filter((p) => p.urgency === "purple").length,                         color: "#8b5cf6" },
+      { name: "Delayed/Urgent",value: projects.filter((p) => ["red","orange"].includes(p.urgency)).length,           color: "#ef4444" },
+      { name: "Hold",          value: projects.filter((p) => p.urgency === "yellow").length,                         color: "#f59e0b" },
     ];
     const workloadData = filteredForStats
       .map((p) => ({
         fullName: p.project_name,
         name: p.project_name,
-        hours:
-          p.contributors?.reduce(
-            (sum, c) => sum + parseFloat(c.total_hours || 0),
-            0,
-          ) || 0,
+        hours: p.contributors?.reduce((sum, c) => sum + parseFloat(c.total_hours || 0), 0) || 0,
       }))
       .sort((a, b) => b.hours - a.hours)
       .slice(0, 5);
@@ -703,9 +317,7 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
 
   const peopleVsOpenData = useMemo(() => {
     const joinMap = {};
-    joinedPeople.forEach((row) => {
-      joinMap[row.join_month] = parseInt(row.cumulative_joins) || 0;
-    });
+    joinedPeople.forEach((row) => { joinMap[row.join_month] = parseInt(row.cumulative_joins) || 0; });
     const openMap = {};
     greenProjects.forEach((p) => {
       if (!p.start_date) return;
@@ -723,13 +335,9 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
 
   const peopleVsClosedData = useMemo(() => {
     const closedMap = {};
-    closedProjects.forEach((row) => {
-      closedMap[row.close_month] = parseInt(row.total_closed_projects) || 0;
-    });
+    closedProjects.forEach((row) => { closedMap[row.close_month] = parseInt(row.total_closed_projects) || 0; });
     const joinMap = {};
-    joinedPeople.forEach((row) => {
-      joinMap[row.join_month] = parseInt(row.cumulative_joins) || 0;
-    });
+    joinedPeople.forEach((row) => { joinMap[row.join_month] = parseInt(row.cumulative_joins) || 0; });
     return last6MonthsFromJuly2025.map((m) => ({
       month: m.month,
       people: joinMap[m.key] || 0,
@@ -740,20 +348,7 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
   const tinyBarData = useMemo(() => {
     if (!projects.length) return [];
     const monthMap = {};
-    const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
+    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     projects.forEach((p) => {
       if (!p.start_date) return;
       const date = new Date(p.start_date);
@@ -761,21 +356,13 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
       const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, "0")}`;
       const label = `${monthNames[date.getMonth()]} ${String(date.getFullYear()).slice(2)}`;
       if (!monthMap[key]) monthMap[key] = { key, month: label, aud: 0 };
-      const spend =
-        p.contributors?.reduce(
-          (sum, c) => sum + parseFloat(c.total_hours || 0),
-          0,
-        ) || 0;
+      const spend = p.contributors?.reduce((sum, c) => sum + parseFloat(c.total_hours || 0), 0) || 0;
       monthMap[key].aud += spend * 150;
     });
-    const sorted = Object.values(monthMap)
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .slice(-12);
+    const sorted = Object.values(monthMap).sort((a, b) => a.key.localeCompare(b.key)).slice(-12);
     return sorted.map((d, i, arr) => {
       const window = arr.slice(Math.max(0, i - 2), i + 1);
-      const trend = Math.round(
-        window.reduce((s, w) => s + w.aud, 0) / window.length,
-      );
+      const trend = Math.round(window.reduce((s, w) => s + w.aud, 0) / window.length);
       return { ...d, trend };
     });
   }, [projects]);
@@ -783,52 +370,46 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
   const avgMonthlySales = useMemo(() => {
     const data = monthlyTotals.length ? monthlyTotals : tinyBarData;
     if (!data.length) return 0;
-    const total = data.reduce((sum, d) => sum + (d.aud || 0), 0);
-    return Math.round(total / data.length);
+    return Math.round(data.reduce((sum, d) => sum + (d.aud || 0), 0) / data.length);
   }, [monthlyTotals, tinyBarData]);
+
+  const projectsPerClientData = useMemo(() => {
+    if (!clientProjects.length) return [];
+    const countMap = {};
+    clientProjects.forEach((row) => {
+      const name = row.customer_name || "Unknown";
+      countMap[name] = (countMap[name] || 0) + (parseInt(row.total_projects) || 0);
+    });
+    return Object.entries(countMap)
+      .map(([name, count]) => ({ name, count }))
+      .filter(({ count }) => count > 3)
+      .sort((a, b) => a.count - b.count);
+  }, [clientProjects]);
 
   const companiesPerMonthData = useMemo(() => {
     const monthMap = {};
-    projectsPerMonth.forEach((row) => {
-      monthMap[row.project_month] = parseInt(row.total_projects) || 0;
-    });
-    const sorted = last24Months.map((m) => ({
-      month: m.month,
-      companies: monthMap[m.key] || 0,
-    }));
+    projectsPerMonth.forEach((row) => { monthMap[row.project_month] = parseInt(row.total_projects) || 0; });
+    const sorted = last24Months.map((m) => ({ month: m.month, companies: monthMap[m.key] || 0 }));
     const vals = sorted.map((d) => d.companies);
     const n = vals.length;
-    const sumX = vals.reduce((s, _, i) => s + i, 0);
-    const sumY = vals.reduce((s, v) => s + v, 0);
+    const sumX  = vals.reduce((s, _, i) => s + i, 0);
+    const sumY  = vals.reduce((s, v) => s + v, 0);
     const sumXY = vals.reduce((s, v, i) => s + i * v, 0);
     const sumX2 = vals.reduce((s, _, i) => s + i * i, 0);
     const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX) || 0;
     const intercept = (sumY - slope * sumX) / n;
-    return sorted.map((d, i) => ({
-      ...d,
-      trend: parseFloat((intercept + slope * i).toFixed(2)),
-    }));
+    return sorted.map((d, i) => ({ ...d, trend: parseFloat((intercept + slope * i).toFixed(2)) }));
   }, [projectsPerMonth, last24Months]);
 
   const salesAndPeopleData = useMemo(() => {
     const salesMap = {};
-    salesPerMonth.forEach((row) => {
-      salesMap[row.invoice_month] = parseFloat(row.total_amount) || 0;
-    });
+    salesPerMonth.forEach((row) => { salesMap[row.invoice_month] = parseFloat(row.total_amount) || 0; });
     const joinMap = {};
-    joinedPeople.forEach((row) => {
-      joinMap[row.join_month] = parseInt(row.cumulative_joins) || 0;
-    });
+    joinedPeople.forEach((row) => { joinMap[row.join_month] = parseInt(row.cumulative_joins) || 0; });
     let lastPeopleValue = 0;
     return last24Months.map((m) => {
-      if (joinMap[m.key] !== undefined) {
-        lastPeopleValue = joinMap[m.key];
-      }
-      return {
-        month: m.month,
-        sales: Math.round(salesMap[m.key] || 0),
-        people: lastPeopleValue,
-      };
+      if (joinMap[m.key] !== undefined) lastPeopleValue = joinMap[m.key];
+      return { month: m.month, sales: Math.round(salesMap[m.key] || 0), people: lastPeopleValue };
     });
   }, [salesPerMonth, joinedPeople, last24Months]);
 
@@ -861,9 +442,7 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
   const RotatedTick = ({ x, y, payload }) => (
     <g transform={`translate(${x},${y})`}>
       <text
-        x={0}
-        y={0}
-        dy={4}
+        x={0} y={0} dy={4}
         textAnchor="end"
         fill="#94a3b8"
         fontSize={9}
@@ -879,9 +458,7 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-[#f8fafc]">
         <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
-        <p className="text-slate-500 font-bold tracking-tight">
-          Syncing DDEV Analytics...
-        </p>
+        <p className="text-slate-500 font-bold tracking-tight">Syncing DDEV Analytics...</p>
       </div>
     );
 
@@ -890,18 +467,16 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
       <div className="p-6 lg:p-12">
         {/* Tab Bar */}
         <div className="flex gap-2 mb-10">
-          {["project", "finance", "employee", "customer retention"].map(
-            (tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-2 rounded-full text-sm font-black uppercase tracking-wide transition
-              ${activeTab === tab ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
-              >
-                {tab === "employee" ? "Employee Evolution" : tab}
-              </button>
-            ),
-          )}
+          {["project", "finance", "employee", "customer retention"].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-2 rounded-full text-sm font-black uppercase tracking-wide transition
+                ${activeTab === tab ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+            >
+              {tab === "employee" ? "Employee Evolution" : tab}
+            </button>
+          ))}
         </div>
 
         {/* ── PROJECT TAB ── */}
@@ -916,12 +491,10 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
                   </h3>
                   <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                     <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-4 h-[2px] bg-[#93c5fd] rounded"></span>
-                      People
+                      <span className="inline-block w-4 h-[2px] bg-[#93c5fd] rounded"></span>People
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-4 h-[2px] bg-[#10b981] rounded"></span>
-                      Open Projects
+                      <span className="inline-block w-4 h-[2px] bg-[#10b981] rounded"></span>Open Projects
                     </span>
                   </div>
                 </div>
@@ -929,90 +502,23 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
                   Jul 24 – Present
                 </p>
                 <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart
-                    data={peopleVsOpenData}
-                    margin={{ top: 10, right: 50, left: 10, bottom: 80 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="#f1f5f9"
-                    />
-                    <XAxis
-                      dataKey="month"
-                      axisLine={false}
-                      tickLine={false}
-                      interval={0}
-                      tick={<RotatedTick />}
-                    />
-                    <YAxis
-                      yAxisId="left"
-                      fontSize={10}
-                      axisLine={false}
-                      tickLine={false}
-                      allowDecimals={false}
+                  <ComposedChart data={peopleVsOpenData} margin={{ top: 10, right: 50, left: 10, bottom: 80 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} interval={0} tick={<RotatedTick />} />
+                    <YAxis yAxisId="left" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
                       tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                      label={{
-                        value: "People",
-                        angle: -90,
-                        position: "insideLeft",
-                        style: {
-                          textAnchor: "middle",
-                          fill: "#94a3b8",
-                          fontSize: 10,
-                          fontWeight: 800,
-                        },
-                      }}
+                      label={{ value: "People", angle: -90, position: "insideLeft", style: { textAnchor: "middle", fill: "#94a3b8", fontSize: 10, fontWeight: 800 } }}
                     />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      fontSize={10}
-                      axisLine={false}
-                      tickLine={false}
-                      allowDecimals={false}
+                    <YAxis yAxisId="right" orientation="right" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
                       tick={{ fill: "#10b981", fontWeight: 700 }}
-                      label={{
-                        value: "Open",
-                        angle: 90,
-                        position: "insideRight",
-                        style: {
-                          textAnchor: "middle",
-                          fill: "#10b981",
-                          fontSize: 10,
-                          fontWeight: 800,
-                        },
-                      }}
+                      label={{ value: "Open", angle: 90, position: "insideRight", style: { textAnchor: "middle", fill: "#10b981", fontSize: 10, fontWeight: 800 } }}
                     />
                     <Tooltip
-                      formatter={(value, name) => [
-                        value,
-                        name === "people" ? "People" : "Open Projects",
-                      ]}
-                      contentStyle={{
-                        borderRadius: "12px",
-                        border: "none",
-                        boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-                      }}
+                      formatter={(value, name) => [value, name === "people" ? "People" : "Open Projects"]}
+                      contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
                     />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="people"
-                      stroke="#93c5fd"
-                      strokeWidth={6}
-                      dot={false}
-                      activeDot={{ r: 5, fill: "#3b82f6" }}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="openProjects"
-                      stroke="#10b981"
-                      strokeWidth={6}
-                      dot={false}
-                      activeDot={{ r: 5, fill: "#10b981" }}
-                    />
+                    <Line yAxisId="left"  type="monotone" dataKey="people"       stroke="#93c5fd" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#3b82f6" }} />
+                    <Line yAxisId="right" type="monotone" dataKey="openProjects" stroke="#10b981" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#10b981" }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -1025,12 +531,10 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
                   </h3>
                   <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                     <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-4 h-[2px] bg-[#93c5fd] rounded"></span>
-                      People
+                      <span className="inline-block w-4 h-[2px] bg-[#93c5fd] rounded"></span>People
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-4 h-[2px] bg-[#8b5cf6] rounded"></span>
-                      Closed Projects
+                      <span className="inline-block w-4 h-[2px] bg-[#8b5cf6] rounded"></span>Closed Projects
                     </span>
                   </div>
                 </div>
@@ -1038,90 +542,23 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
                   Jul 24 – Present
                 </p>
                 <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart
-                    data={peopleVsClosedData}
-                    margin={{ top: 10, right: 50, left: 10, bottom: 80 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="#f1f5f9"
-                    />
-                    <XAxis
-                      dataKey="month"
-                      axisLine={false}
-                      tickLine={false}
-                      interval={0}
-                      tick={<RotatedTick />}
-                    />
-                    <YAxis
-                      yAxisId="left"
-                      fontSize={10}
-                      axisLine={false}
-                      tickLine={false}
-                      allowDecimals={false}
+                  <ComposedChart data={peopleVsClosedData} margin={{ top: 10, right: 50, left: 10, bottom: 80 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} interval={0} tick={<RotatedTick />} />
+                    <YAxis yAxisId="left" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
                       tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                      label={{
-                        value: "People",
-                        angle: -90,
-                        position: "insideLeft",
-                        style: {
-                          textAnchor: "middle",
-                          fill: "#94a3b8",
-                          fontSize: 10,
-                          fontWeight: 800,
-                        },
-                      }}
+                      label={{ value: "People", angle: -90, position: "insideLeft", style: { textAnchor: "middle", fill: "#94a3b8", fontSize: 10, fontWeight: 800 } }}
                     />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      fontSize={10}
-                      axisLine={false}
-                      tickLine={false}
-                      allowDecimals={false}
+                    <YAxis yAxisId="right" orientation="right" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
                       tick={{ fill: "#8b5cf6", fontWeight: 700 }}
-                      label={{
-                        value: "Closed",
-                        angle: 90,
-                        position: "insideRight",
-                        style: {
-                          textAnchor: "middle",
-                          fill: "#8b5cf6",
-                          fontSize: 10,
-                          fontWeight: 800,
-                        },
-                      }}
+                      label={{ value: "Closed", angle: 90, position: "insideRight", style: { textAnchor: "middle", fill: "#8b5cf6", fontSize: 10, fontWeight: 800 } }}
                     />
                     <Tooltip
-                      formatter={(value, name) => [
-                        value,
-                        name === "people" ? "People" : "Closed Projects",
-                      ]}
-                      contentStyle={{
-                        borderRadius: "12px",
-                        border: "none",
-                        boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-                      }}
+                      formatter={(value, name) => [value, name === "people" ? "People" : "Closed Projects"]}
+                      contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
                     />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="people"
-                      stroke="#93c5fd"
-                      strokeWidth={6}
-                      dot={false}
-                      activeDot={{ r: 5, fill: "#3b82f6" }}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="closedProjects"
-                      stroke="#8b5cf6"
-                      strokeWidth={6}
-                      dot={false}
-                      activeDot={{ r: 5, fill: "#8b5cf6" }}
-                    />
+                    <Line yAxisId="left"  type="monotone" dataKey="people"         stroke="#93c5fd" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#3b82f6" }} />
+                    <Line yAxisId="right" type="monotone" dataKey="closedProjects" stroke="#8b5cf6" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#8b5cf6" }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -1135,65 +572,27 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
                     <BarChart3 size={16} /> Projects per Client
                   </h3>
                 </div>
-                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-4">
-                  All time
-                </p>
+                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-4">All time</p>
                 <ResponsiveContainer width="100%" height={320}>
-                  <BarChart
-                    data={projectsPerClientData}
-                    margin={{ top: 10, right: 20, left: 10, bottom: 100 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="#f1f5f9"
-                    />
-                    <XAxis
-                      dataKey="name"
-                      axisLine={false}
-                      tickLine={false}
-                      interval={0}
-                      tick={<RotatedTick />}
-                    />
-                    <YAxis
-                      fontSize={10}
-                      axisLine={false}
-                      tickLine={false}
-                      allowDecimals={false}
+                  <BarChart data={projectsPerClientData} margin={{ top: 10, right: 20, left: 10, bottom: 100 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} tick={<RotatedTick />} />
+                    <YAxis fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
                       tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                      label={{
-                        value: "Num of project",
-                        angle: -90,
-                        position: "insideLeft",
-                        style: {
-                          textAnchor: "middle",
-                          fill: "#94a3b8",
-                          fontSize: 10,
-                          fontWeight: 800,
-                        },
-                      }}
+                      label={{ value: "Num of project", angle: -90, position: "insideLeft", style: { textAnchor: "middle", fill: "#94a3b8", fontSize: 10, fontWeight: 800 } }}
                     />
                     <Tooltip
                       formatter={(value) => [value, "Projects"]}
-                      contentStyle={{
-                        borderRadius: "12px",
-                        border: "none",
-                        boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-                      }}
+                      contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
                       cursor={{ fill: "#f8fafc" }}
                     />
-                    <Bar
-                      dataKey="count"
-                      fill="#2c6cd3"
-                      radius={[6, 6, 0, 0]}
-                      barSize={32}
-                    />
+                    <Bar dataKey="count" fill="#2c6cd3" radius={[6, 6, 0, 0]} barSize={32} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </section>
 
-            {/* 3 chart row */}
+            {/* 3-chart row */}
             <section className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-12">
               <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 h-96">
                 <h3 className="text-sm font-black text-slate-400 uppercase mb-4 flex items-center gap-2">
@@ -1201,104 +600,43 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
                 </h3>
                 <ResponsiveContainer width="100%" height="90%">
                   <PieChart>
-                    <Pie
-                      data={stats?.statusData}
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
+                    <Pie data={stats?.statusData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
                       {stats?.statusData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
                     <Tooltip />
-                    <Legend
-                      iconType="circle"
-                      wrapperStyle={{ paddingTop: "20px" }}
-                    />
+                    <Legend iconType="circle" wrapperStyle={{ paddingTop: "20px" }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
+
               <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 h-96">
                 <h3 className="text-sm font-black text-slate-400 uppercase mb-4 flex items-center gap-2">
                   <BarChart3 size={16} /> Effort (Hours)
                 </h3>
                 <ResponsiveContainer width="100%" height="90%">
-                  <BarChart
-                    data={stats?.workloadData}
-                    layout="vertical"
-                    margin={{ left: 40, right: 20 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      horizontal={false}
-                      stroke="#f1f5f9"
-                    />
-                    <XAxis
-                      type="number"
-                      fontSize={10}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      fontSize={9}
-                      axisLine={false}
-                      tickLine={false}
-                      width={100}
-                    />
+                  <BarChart data={stats?.workloadData} layout="vertical" margin={{ left: 40, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                    <XAxis type="number" fontSize={10} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="name" type="category" fontSize={9} axisLine={false} tickLine={false} width={100} />
                     <Tooltip cursor={{ fill: "#f8fafc" }} />
-                    <Bar
-                      dataKey="hours"
-                      fill="#3b82f6"
-                      radius={[0, 4, 4, 0]}
-                      onClick={handleBarClick}
-                      className="cursor-pointer"
-                      barSize={20}
-                    />
+                    <Bar dataKey="hours" fill="#3b82f6" radius={[0, 4, 4, 0]} onClick={handleBarClick} className="cursor-pointer" barSize={20} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+
               <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 h-96">
                 <h3 className="text-sm font-black text-slate-400 uppercase mb-4 flex items-center gap-2">
                   <AlertTriangle size={16} /> Staff Concentration
                 </h3>
                 <ResponsiveContainer width="100%" height="90%">
-                  <BarChart
-                    data={stats?.concentrationData}
-                    layout="vertical"
-                    margin={{ left: 40, right: 20 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      horizontal={false}
-                      stroke="#f1f5f9"
-                    />
-                    <XAxis
-                      type="number"
-                      fontSize={10}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      fontSize={9}
-                      axisLine={false}
-                      tickLine={false}
-                      width={100}
-                    />
+                  <BarChart data={stats?.concentrationData} layout="vertical" margin={{ left: 40, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                    <XAxis type="number" fontSize={10} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="name" type="category" fontSize={9} axisLine={false} tickLine={false} width={100} />
                     <Tooltip />
-                    <Bar
-                      dataKey="staff"
-                      fill="#f59e0b"
-                      radius={[0, 4, 4, 0]}
-                      onClick={handleBarClick}
-                      className="cursor-pointer"
-                      barSize={20}
-                    />
+                    <Bar dataKey="staff" fill="#f59e0b" radius={[0, 4, 4, 0]} onClick={handleBarClick} className="cursor-pointer" barSize={20} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1309,12 +647,9 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
               <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <TrendingUp size={16} className="text-blue-500" /> Recently
-                    Created
+                    <TrendingUp size={16} className="text-blue-500" /> Recently Created
                   </h3>
-                  <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-3 py-1 rounded-full">
-                    New Entries
-                  </span>
+                  <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-3 py-1 rounded-full">New Entries</span>
                 </div>
                 <div className="space-y-4">
                   {recentProjects.map((p) => (
@@ -1328,30 +663,22 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
                           #{p.project_id}
                         </div>
                         <div>
-                          <p className="text-sm font-black text-slate-800">
-                            {p.project_name}
-                          </p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                            {p.p_team}
-                          </p>
+                          <p className="text-sm font-black text-slate-800">{p.project_name}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{p.p_team}</p>
                         </div>
                       </div>
-                      <p className="text-xs font-bold text-slate-400">
-                        {p.start_date}
-                      </p>
+                      <p className="text-xs font-bold text-slate-400">{p.start_date}</p>
                     </div>
                   ))}
                 </div>
               </div>
+
               <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <AlertTriangle size={16} className="text-slate-400" />{" "}
-                    Pending Start
+                    <AlertTriangle size={16} className="text-slate-400" /> Pending Start
                   </h3>
-                  <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-3 py-1 rounded-full">
-                    Not Started
-                  </span>
+                  <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-3 py-1 rounded-full">Not Started</span>
                 </div>
                 <div className="space-y-4">
                   {notStartedProjects.length > 0 ? (
@@ -1366,17 +693,11 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
                             #{p.project_id}
                           </div>
                           <div>
-                            <p className="text-sm font-black text-slate-800">
-                              {p.project_name}
-                            </p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                              {p.p_team}
-                            </p>
+                            <p className="text-sm font-black text-slate-800">{p.project_name}</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{p.p_team}</p>
                           </div>
                         </div>
-                        <p className="text-xs font-bold text-slate-400">
-                          {p.start_date}
-                        </p>
+                        <p className="text-xs font-bold text-slate-400">{p.start_date}</p>
                       </div>
                     ))
                   ) : (
@@ -1391,19 +712,14 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
             {/* Search + Project Cards */}
             <header className="mb-12 flex flex-col xl:flex-row xl:items-center justify-between gap-8">
               <div>
-                <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
-                  it Projects
-                </h1>
+                <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">it Projects</h1>
                 {searchTerm && (
                   <p className="text-blue-600 font-bold text-sm mt-2 flex items-center gap-2">
                     <Search size={14} /> Result for: "{searchTerm}"
                   </p>
                 )}
               </div>
-              <SearchBar
-                searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm}
-              />
+              <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
             </header>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10">
               {filteredProjects.map((project) => (
@@ -1426,76 +742,25 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
                   data={monthlyTotals.length ? monthlyTotals : tinyBarData}
                   margin={{ top: 5, right: 10, left: 10, bottom: 0 }}
                 >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="#f1f5f9"
-                  />
-                  <XAxis
-                    dataKey="month"
-                    fontSize={10}
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                  />
-                  <YAxis
-                    fontSize={10}
-                    axisLine={false}
-                    tickLine={false}
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="month" fontSize={10} axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontWeight: 700 }} />
+                  <YAxis fontSize={10} axisLine={false} tickLine={false}
                     tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
                     tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                    label={{
-                      value: "AUD",
-                      angle: -90,
-                      position: "insideLeft",
-                      style: {
-                        textAnchor: "middle",
-                        fill: "#94a3b8",
-                        fontSize: 11,
-                        fontWeight: 800,
-                        letterSpacing: "0.08em",
-                      },
-                    }}
+                    label={{ value: "AUD", angle: -90, position: "insideLeft", style: { textAnchor: "middle", fill: "#94a3b8", fontSize: 11, fontWeight: 800, letterSpacing: "0.08em" } }}
                   />
                   <Tooltip
-                    formatter={(value, name) => [
-                      `$${value.toLocaleString()} AUD`,
-                      name === "aud" ? "Spend" : "Trend",
-                    ]}
-                    contentStyle={{
-                      borderRadius: "12px",
-                      border: "none",
-                      boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-                    }}
+                    formatter={(value, name) => [`$${value.toLocaleString()} AUD`, name === "aud" ? "Spend" : "Trend"]}
+                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
                     cursor={{ fill: "#f8fafc" }}
                   />
-                  <Bar
-                    dataKey="aud"
-                    fill="#8884d8"
-                    radius={[8, 8, 0, 0]}
-                    barSize={28}
-                  />
-                  {/* <Line
-                    type="monotone"
-                    dataKey="trend"
-                    stroke="#f97316"
-                    strokeWidth={2.5}
-                    dot={{ r: 4, fill: "#f97316", strokeWidth: 0 }}
-                    activeDot={{ r: 6 }}
-                  /> */}
-
+                  <Bar dataKey="aud" fill="#8884d8" radius={[8, 8, 0, 0]} barSize={28} />
                   <ReferenceLine
                     y={avgMonthlySales}
                     stroke="#22c55e"
                     strokeWidth={2}
                     strokeDasharray="6 3"
-                    label={{
-                      value: `Avg $${(avgMonthlySales / 1000).toFixed(1)}k`,
-                      position: "insideTopRight",
-                      fill: "#22c55e",
-                      fontSize: 11,
-                      fontWeight: 800,
-                    }}
+                    label={{ value: `Avg $${(avgMonthlySales / 1000).toFixed(1)}k`, position: "insideTopRight", fill: "#22c55e", fontSize: 11, fontWeight: 800 }}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
@@ -1508,60 +773,20 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
                   <TrendingUp size={16} /> Total Company v/s Month
                 </h3>
               </div>
-              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-2">
-                Last 24 months
-              </p>
+              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-2">Last 24 months</p>
               <ResponsiveContainer width="100%" height={280}>
-                <ComposedChart
-                  data={companiesPerMonthData}
-                  margin={{ top: 10, right: 20, left: 10, bottom: 80 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="#f1f5f9"
-                  />
-                  <XAxis
-                    dataKey="month"
-                    axisLine={false}
-                    tickLine={false}
-                    interval={0}
-                    tick={<RotatedTick />}
-                  />
-                  <YAxis
-                    fontSize={10}
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
+                <ComposedChart data={companiesPerMonthData} margin={{ top: 10, right: 20, left: 10, bottom: 80 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} interval={0} tick={<RotatedTick />} />
+                  <YAxis fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
                     tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                    label={{
-                      value: "projects",
-                      angle: -90,
-                      position: "insideLeft",
-                      style: {
-                        textAnchor: "middle",
-                        fill: "#94a3b8",
-                        fontSize: 10,
-                        fontWeight: 800,
-                      },
-                    }}
+                    label={{ value: "projects", angle: -90, position: "insideLeft", style: { textAnchor: "middle", fill: "#94a3b8", fontSize: 10, fontWeight: 800 } }}
                   />
                   <Tooltip
                     formatter={(value) => [value, "Projects"]}
-                    contentStyle={{
-                      borderRadius: "12px",
-                      border: "none",
-                      boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-                    }}
+                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="companies"
-                    stroke="#93c5fd"
-                    strokeWidth={6}
-                    dot={false}
-                    activeDot={{ r: 5, fill: "#3b82f6" }}
-                  />
+                  <Line type="monotone" dataKey="companies" stroke="#93c5fd" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#3b82f6" }} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -1574,107 +799,36 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
                 </h3>
                 <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                   <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-4 h-[2px] bg-[#93c5fd] rounded"></span>
-                    Sales (AUD)
+                    <span className="inline-block w-4 h-[2px] bg-[#93c5fd] rounded"></span>Sales (AUD)
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-4 h-[2px] bg-[#f97316] rounded"></span>
-                    People
+                    <span className="inline-block w-4 h-[2px] bg-[#f97316] rounded"></span>People
                   </span>
                 </div>
               </div>
-              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-2">
-                Last 24 months
-              </p>
+              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-2">Last 24 months</p>
               <ResponsiveContainer width="100%" height={280}>
-                <ComposedChart
-                  data={salesAndPeopleData}
-                  margin={{ top: 10, right: 50, left: 10, bottom: 80 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="#f1f5f9"
-                  />
-                  <XAxis
-                    dataKey="month"
-                    axisLine={false}
-                    tickLine={false}
-                    interval={0}
-                    tick={<RotatedTick />}
-                  />
-                  <YAxis
-                    yAxisId="left"
-                    fontSize={10}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v) =>
-                      v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`
-                    }
+                <ComposedChart data={salesAndPeopleData} margin={{ top: 10, right: 50, left: 10, bottom: 80 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} interval={0} tick={<RotatedTick />} />
+                  <YAxis yAxisId="left" fontSize={10} axisLine={false} tickLine={false}
+                    tickFormatter={(v) => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`}
                     tick={{ fill: "#94a3b8", fontWeight: 700 }}
-                    label={{
-                      value: "Sales",
-                      angle: -90,
-                      position: "insideLeft",
-                      style: {
-                        textAnchor: "middle",
-                        fill: "#94a3b8",
-                        fontSize: 10,
-                        fontWeight: 800,
-                      },
-                    }}
+                    label={{ value: "Sales", angle: -90, position: "insideLeft", style: { textAnchor: "middle", fill: "#94a3b8", fontSize: 10, fontWeight: 800 } }}
                   />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    fontSize={10}
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
+                  <YAxis yAxisId="right" orientation="right" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false}
                     tick={{ fill: "#f97316", fontWeight: 700 }}
-                    label={{
-                      value: "People",
-                      angle: 90,
-                      position: "insideRight",
-                      style: {
-                        textAnchor: "middle",
-                        fill: "#f97316",
-                        fontSize: 10,
-                        fontWeight: 800,
-                      },
-                    }}
+                    label={{ value: "People", angle: 90, position: "insideRight", style: { textAnchor: "middle", fill: "#f97316", fontSize: 10, fontWeight: 800 } }}
                   />
                   <Tooltip
                     formatter={(value, name) => [
-                      name === "sales"
-                        ? `$${value.toLocaleString()} AUD`
-                        : `${value} people`,
+                      name === "sales" ? `$${value.toLocaleString()} AUD` : `${value} people`,
                       name === "sales" ? "Sales" : "People",
                     ]}
-                    contentStyle={{
-                      borderRadius: "12px",
-                      border: "none",
-                      boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-                    }}
+                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
                   />
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="sales"
-                    stroke="#93c5fd"
-                    strokeWidth={6}
-                    dot={false}
-                    activeDot={{ r: 5, fill: "#3b82f6" }}
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="people"
-                    stroke="#f97316"
-                    strokeWidth={6}
-                    dot={false}
-                    activeDot={{ r: 5, fill: "#f97316" }}
-                  />
+                  <Line yAxisId="left"  type="monotone" dataKey="sales"  stroke="#93c5fd" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#3b82f6" }} />
+                  <Line yAxisId="right" type="monotone" dataKey="people" stroke="#f97316" strokeWidth={6} dot={false} activeDot={{ r: 5, fill: "#f97316" }} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -1687,27 +841,16 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
             <table className="w-full border-collapse" id="myTable">
               <thead>
                 <tr className="bg-slate-100 text-slate-600 text-sm uppercase tracking-wide">
-                  <th className="border border-slate-200 px-4 py-2 text-left">
-                    Name
-                  </th>
-                  <th className="border border-slate-200 px-4 py-2 text-left">
-                    Designation
-                  </th>
-                  <th className="border border-slate-200 px-4 py-2 text-center">
-                    Total Projects
-                  </th>
-                  <th className="border border-slate-200 px-4 py-2 text-center">
-                    Total Subprojects
-                  </th>
+                  <th className="border border-slate-200 px-4 py-2 text-left">Name</th>
+                  <th className="border border-slate-200 px-4 py-2 text-left">Designation</th>
+                  <th className="border border-slate-200 px-4 py-2 text-center">Total Projects</th>
+                  <th className="border border-slate-200 px-4 py-2 text-center">Total Subprojects</th>
                 </tr>
               </thead>
               <tbody>
                 {employeeEvolution.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={4}
-                      className="border border-slate-200 px-4 py-8 text-center text-slate-400 italic"
-                    >
+                    <td colSpan={4} className="border border-slate-200 px-4 py-8 text-center text-slate-400 italic">
                       No employee data found.
                     </td>
                   </tr>
@@ -1715,22 +858,13 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
                   employeeEvolution.map((emp, idx) => (
                     <tr
                       key={idx}
-                      // ✅ FIX: Call handleEmployeeClick so projects are fetched
                       onClick={() => handleEmployeeClick(emp)}
                       className="cursor-pointer hover:bg-blue-50 transition-colors"
                     >
-                      <td className="border border-slate-200 px-4 py-2">
-                        {emp.fullname || "—"}
-                      </td>
-                      <td className="border border-slate-200 px-4 py-2">
-                        {emp.designation || "—"}
-                      </td>
-                      <td className="border border-slate-200 px-4 py-2 text-center">
-                        {emp.total_projects_worked ?? 0}
-                      </td>
-                      <td className="border border-slate-200 px-4 py-2 text-center">
-                        {emp.total_subprojects_worked ?? 0}
-                      </td>
+                      <td className="border border-slate-200 px-4 py-2">{emp.fullname || "—"}</td>
+                      <td className="border border-slate-200 px-4 py-2">{emp.designation || "—"}</td>
+                      <td className="border border-slate-200 px-4 py-2 text-center">{emp.total_projects_worked ?? 0}</td>
+                      <td className="border border-slate-200 px-4 py-2 text-center">{emp.total_subprojects_worked ?? 0}</td>
                     </tr>
                   ))
                 )}
@@ -1739,69 +873,41 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
           </div>
         )}
 
+        {/* ── CUSTOMER RETENTION TAB ── */}
         {activeTab === "customer retention" && (
           <div className="w-full bg-slate-50 rounded-3xl border border-slate-200 p-6">
             <table className="w-full border-collapse" id="customerTable">
               <thead>
                 <tr className="bg-slate-100 text-slate-600 text-sm uppercase tracking-wide">
-                  <th className="border border-slate-200 px-4 py-2 text-left">
-                    Customer Name
-                  </th>
-                  <th className="border border-slate-200 px-4 py-2 text-left">
-                    Contact
-                  </th>
-                  <th className="border border-slate-200 px-4 py-2 text-left">
-                    Mail
-                  </th>
-                  <th className="border border-slate-200 px-4 py-2 text-center">
-                    Total Projects
-                  </th>
-                  <th className="border border-slate-200 px-4 py-2 text-center">
-                    Total People
-                  </th>
-                  <th className="border border-slate-200 px-4 py-2 text-center">
-                    Total Amount
-                  </th>
+                  <th className="border border-slate-200 px-4 py-2 text-left">Customer Name</th>
+                  <th className="border border-slate-200 px-4 py-2 text-left">Contact</th>
+                  <th className="border border-slate-200 px-4 py-2 text-left">Mail</th>
+                  <th className="border border-slate-200 px-4 py-2 text-center">Total Projects</th>
+                  <th className="border border-slate-200 px-4 py-2 text-center">Total People</th>
+                  <th className="border border-slate-200 px-4 py-2 text-center">Total Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {aggregatedCustomerData.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={6}
-                      className="border border-slate-200 px-4 py-8 text-center text-slate-400 italic"
-                    >
+                    <td colSpan={6} className="border border-slate-200 px-4 py-8 text-center text-slate-400 italic">
                       No customer data found.
                     </td>
                   </tr>
                 ) : (
                   aggregatedCustomerData.map((customer, idx) => {
-                    const totalPeople = customer.projects.reduce(
-                      (sum, p) => sum + (p.total_people || 0),
-                      0,
-                    );
-
+                    const totalPeople = customer.projects.reduce((sum, p) => sum + (p.total_people || 0), 0);
                     return (
                       <tr
                         key={idx}
                         onClick={() => handleCustomerClick(customer)}
                         className="cursor-pointer hover:bg-blue-50 transition-colors"
                       >
-                        <td className="border border-slate-200 px-4 py-2 font-medium">
-                          {customer.client_name || "—"}
-                        </td>
-                        <td className="border border-slate-200 px-4 py-2">
-                          {customer.contact_phone || "—"}
-                        </td>
-                        <td className="border border-slate-200 px-4 py-2">
-                          {customer.contact_email || "—"}
-                        </td>
-                        <td className="border border-slate-200 px-4 py-2 text-center font-bold">
-                          {customer.total_projects}
-                        </td>
-                        <td className="border border-slate-200 px-4 py-2 text-center font-bold text-purple-600">
-                          {totalPeople}
-                        </td>
+                        <td className="border border-slate-200 px-4 py-2 font-medium">{customer.client_name || "—"}</td>
+                        <td className="border border-slate-200 px-4 py-2">{customer.contact_phone || "—"}</td>
+                        <td className="border border-slate-200 px-4 py-2">{customer.contact_email || "—"}</td>
+                        <td className="border border-slate-200 px-4 py-2 text-center font-bold">{customer.total_projects}</td>
+                        <td className="border border-slate-200 px-4 py-2 text-center font-bold text-purple-600">{totalPeople}</td>
                         <td className="border border-slate-200 px-4 py-2 text-center font-bold text-green-600">
                           ${customer.total_amount.toLocaleString()}
                         </td>
@@ -1815,7 +921,7 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
         )}
       </div>
 
-      {/* Customer Projects Modal */}
+      {/* ── Customer Projects Modal ── */}
       {selectedCustomer && (
         <CustomerProjectModal
           selectedCustomer={selectedCustomer}
@@ -1823,6 +929,8 @@ export default function IT({ filter, searchTerm, setSearchTerm }) {
           setSelectedCustomer={setSelectedCustomer}
         />
       )}
+
+      {/* ── Employee Projects Modal ── */}
       {selectedEmployee && (
         <EmployeeProjectModal
           selectedEmployee={selectedEmployee}
