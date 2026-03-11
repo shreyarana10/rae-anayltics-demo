@@ -204,6 +204,7 @@ ORDER BY a.fullname;
 const getCustomerRetentionQuery = `
 SELECT 
     c.customer_name AS client_name,
+     c.contact_name AS contact_person,
     p.project_name AS project_title,
     c.contact_phone_number,
     c.contact_email,
@@ -299,6 +300,7 @@ AND numbers.n <= (
 
 GROUP BY 
     c.customer_name,
+    c.contact_name, 
     p.project_name,
     c.contact_phone_number,
     c.contact_email,

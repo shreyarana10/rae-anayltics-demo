@@ -62,6 +62,7 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
         customerMap.set(key, {
           client_name: row.client_name,
           contact_phone: row.contact_phone_number,
+          contact_person: row.contact_person,
           contact_email: row.contact_email,
           total_projects: 0,
           total_amount: 0,
@@ -1454,6 +1455,9 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
                     Contact
                   </th>
                   <th className="border border-slate-200 px-4 py-2 text-center">
+                    Contact Name
+                  </th>
+                  <th className="border border-slate-200 px-4 py-2 text-center">
                     Mail
                   </th>
                   <th className="border border-slate-200 px-4 py-2 text-center">
@@ -1494,6 +1498,9 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
                         </td>
                         <td className="border border-slate-200 px-4 py-2 text-center">
                           {customer.contact_phone || "—"}
+                        </td>
+                        <td className="border border-slate-200 px-4 py-2 text-center">
+                          {customer.contact_person || "—"}
                         </td>
                         <td className="border border-slate-200 px-4 py-2 text-center">
                           {customer.contact_email || "—"}
