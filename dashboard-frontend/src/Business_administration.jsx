@@ -69,16 +69,22 @@ export default function Business({ filter, searchTerm, setSearchTerm }) {
   // ── Initialize DataTable when employee tab is active ──
   useEffect(() => {
     if (activeTab === "employee" && employeeEvolution.length > 0) {
+      // Destroy existing table if any
+      if (DataTable.isDataTable("#myTable")) {
+        new DataTable("#myTable").destroy();
+      }
+
       const table = new DataTable("#myTable", {
         destroy: true,
         pageLength: 50,
         responsive: true,
         order: [[0, "asc"]],
+        // Use DataTables built-in column classes
+        columnDefs: [{ targets: [0, 1, 2, 3], className: "dt-center" }],
       });
+
       return () => {
-        if (table) {
-          table.destroy();
-        }
+        if (table) table.destroy();
       };
     }
   }, [activeTab, employeeEvolution]);

@@ -238,12 +238,20 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
   // ── DataTable: employee tab ──
   useEffect(() => {
     if (activeTab === "employee" && employeeEvolution.length > 0) {
+      // Destroy existing table if any
+      if (DataTable.isDataTable("#myTable")) {
+        new DataTable("#myTable").destroy();
+      }
+
       const table = new DataTable("#myTable", {
         destroy: true,
         pageLength: 50,
         responsive: true,
         order: [[0, "asc"]],
+        // Use DataTables built-in column classes
+        columnDefs: [{ targets: [0, 1, 2, 3], className: "dt-center" }],
       });
+
       return () => {
         if (table) table.destroy();
       };
@@ -256,12 +264,22 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
       activeTab === "customer retention" &&
       aggregatedCustomerData.length > 0
     ) {
+      // Destroy existing table if any
+      if (DataTable.isDataTable("#customerTable")) {
+        new DataTable("#customerTable").destroy();
+      }
+
       const table = new DataTable("#customerTable", {
         destroy: true,
         pageLength: 50,
         responsive: true,
         order: [[0, "asc"]],
+        // Add columnDefs to center ALL columns
+        columnDefs: [
+          { targets: "_all", className: "dt-center" }, // This centers all columns
+        ],
       });
+
       return () => {
         if (table) table.destroy();
       };
@@ -321,11 +339,6 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
     });
   }, [last24Months]);
 
-
-
-
-
-
   // ── Derived chart data ──
   const stats = useMemo(() => {
     if (!projects.length) return null;
@@ -336,7 +349,6 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
         p.project_id?.toString().includes(searchTerm);
       return searchTerm?.trim() !== "" ? matchesSearch : p.p_team === filter;
     });
-
 
     const statusData = [
       {
@@ -362,7 +374,6 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
       },
     ];
 
-
     const workloadData = filteredForStats
       .map((p) => ({
         fullName: p.project_name,
@@ -385,12 +396,6 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
       .slice(0, 5);
     return { statusData, workloadData, concentrationData };
   }, [projects, filter, searchTerm]);
-
-
-
-
-
-
 
   const peopleVsOpenData = useMemo(() => {
     const joinMap = {};
@@ -1385,10 +1390,10 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
             <table className="w-full border-collapse" id="myTable">
               <thead>
                 <tr className="bg-slate-100 text-slate-600 text-sm uppercase tracking-wide">
-                  <th className="border border-slate-200 px-4 py-2 text-left">
+                  <th className="border border-slate-200 px-4 py-2 text-center">
                     Name
                   </th>
-                  <th className="border border-slate-200 px-4 py-2 text-left">
+                  <th className="border border-slate-200 px-4 py-2 text-center">
                     Designation
                   </th>
                   <th className="border border-slate-200 px-4 py-2 text-center">
@@ -1416,10 +1421,10 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
                       onClick={() => handleEmployeeClick(emp)}
                       className="cursor-pointer hover:bg-blue-50 transition-colors"
                     >
-                      <td className="border border-slate-200 px-4 py-2">
+                      <td className="border border-slate-200 px-4 py-2 text-center">
                         {emp.fullname || "—"}
                       </td>
-                      <td className="border border-slate-200 px-4 py-2">
+                      <td className="border border-slate-200 px-4 py-2 text-center">
                         {emp.designation || "—"}
                       </td>
                       <td className="border border-slate-200 px-4 py-2 text-center">
@@ -1442,13 +1447,13 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
             <table className="w-full border-collapse" id="customerTable">
               <thead>
                 <tr className="bg-slate-100 text-slate-600 text-sm uppercase tracking-wide">
-                  <th className="border border-slate-200 px-4 py-2 text-left">
+                  <th className="border border-slate-200 px-4 py-2 text-center">
                     Customer Name
                   </th>
-                  <th className="border border-slate-200 px-4 py-2 text-left">
+                  <th className="border border-slate-200 px-4 py-2 text-center">
                     Contact
                   </th>
-                  <th className="border border-slate-200 px-4 py-2 text-left">
+                  <th className="border border-slate-200 px-4 py-2 text-center">
                     Mail
                   </th>
                   <th className="border border-slate-200 px-4 py-2 text-center">
@@ -1484,13 +1489,13 @@ export default function Building({ filter, searchTerm, setSearchTerm }) {
                         onClick={() => handleCustomerClick(customer)}
                         className="cursor-pointer hover:bg-blue-50 transition-colors"
                       >
-                        <td className="border border-slate-200 px-4 py-2 font-medium">
+                        <td className="border border-slate-200 px-4 py-2 font-medium text-center">
                           {customer.client_name || "—"}
                         </td>
-                        <td className="border border-slate-200 px-4 py-2">
+                        <td className="border border-slate-200 px-4 py-2 text-center">
                           {customer.contact_phone || "—"}
                         </td>
-                        <td className="border border-slate-200 px-4 py-2">
+                        <td className="border border-slate-200 px-4 py-2 text-center">
                           {customer.contact_email || "—"}
                         </td>
                         <td className="border border-slate-200 px-4 py-2 text-center font-bold">
