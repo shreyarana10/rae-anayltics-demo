@@ -45,44 +45,44 @@ app.use("/api/accounts", businessRoutes);
 const salesRoutes = require("./routes/SalesRoutes");
 app.use("/api/sales", salesRoutes);
 
-app.get("/api/team-projects", async (req, res) => {
-  try {
-    const [rows] = await db.query(`
-            SELECT 
-                p.project_id, 
-                p.project_name, 
-                p.p_team, 
-                p.progress, 
-                p.start_date,
-                p.assign_to_id,
-                p.assign_to,
-                p.urgency,
-                COALESCE(ts.total_hours, 0) as hours_spent,
-                u.fullname as engineer_name,
-                u.profile_pic as engineer_image
-            FROM projects p
-            LEFT JOIN (
-                SELECT project_id_timesheet, SUM(working_hours) as total_hours 
-                FROM timesheet 
-                GROUP BY project_id_timesheet
-            ) ts ON p.project_id = ts.project_id_timesheet
-            LEFT JOIN tbl_admin u ON p.assign_to_id = u.user_id
-            ORDER BY p.start_date DESC
-        `);
+// app.get("/api/team-projects", async (req, res) => {
+//   try {
+//     const [rows] = await db.query(`
+//             SELECT
+//                 p.project_id,
+//                 p.project_name,
+//                 p.p_team,
+//                 p.progress,
+//                 p.start_date,
+//                 p.assign_to_id,
+//                 p.assign_to,
+//                 p.urgency,
+//                 COALESCE(ts.total_hours, 0) as hours_spent,
+//                 u.fullname as engineer_name,
+//                 u.profile_pic as engineer_image
+//             FROM projects p
+//             LEFT JOIN (
+//                 SELECT project_id_timesheet, SUM(working_hours) as total_hours
+//                 FROM timesheet
+//                 GROUP BY project_id_timesheet
+//             ) ts ON p.project_id = ts.project_id_timesheet
+//             LEFT JOIN tbl_admin u ON p.assign_to_id = u.user_id
+//             ORDER BY p.start_date DESC
+//         `);
 
-    // Categorize the data for the frontend
-    const categories = {
-      not_assigned: rows.filter((p) => !p.assign_to_id),
-      not_started: rows.filter((p) => p.assign_to_id && p.progress === 0),
-      newly_started: rows.filter((p) => p.progress > 0 && p.progress <= 20),
-    };
+//     // Categorize the data for the frontend
+//     const categories = {
+//       not_assigned: rows.filter((p) => !p.assign_to_id),
+//       not_started: rows.filter((p) => p.assign_to_id && p.progress === 0),
+//       newly_started: rows.filter((p) => p.progress > 0 && p.progress <= 20),
+//     };
 
-    res.json(categories);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-// ... existing imports and DB config
+//     res.json(categories);
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
 app.get("/api/detailed-projects-building", async (req, res) => {
   try {
     const [rows] = await db.query(`
