@@ -1,6 +1,6 @@
-const express = require('express');
-const mysql = require('mysql2/promise');
-const cors = require('cors');
+const express = require("express");
+const mysql = require("mysql2/promise");
+const cors = require("cors");
 
 const app = express();
 app.use(cors());
@@ -9,19 +9,45 @@ app.use(express.json());
 // FIXED: Host changed to localhost for your MacBook Air
 // FIXED: Ensure password matches your local MySQL setup
 const db = mysql.createPool({
-    host: '195.35.7.160',
-    port: 3306,        // The specific port from your ddev describe ddev port 61567
-    user: 'csaengg',         // DDEV default user
-    password: 'Revanthshiva3',     // DDEV default password
-    database: 'csarae',     // DDEV default database name
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+  // host: "195.35.7.160",
+  // port: 3306, // The specific port from your ddev describe ddev port 61567
+  // user: "csaengg", // DDEV default user
+  // password: "Revanthshiva3", // DDEV default password
+  // database: "csarae", // DDEV default database name
+  // waitForConnections: true,
+  // connectionLimit: 10,
+  // queueLimit: 0,
+  host: "localhost",
+  port: 3306, // The specific port from your ddev describe ddev port 61567
+  user: "root", // DDEV default user
+  password: "", // DDEV default password
+  database: "csaraebackuponline", // DDEV default database name
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 });
 
-app.get('/api/team-projects', async (req, res) => {
-    try {
-        const [rows] = await db.query(`
+const financeRoutes = require("./routes/financeRoutes");
+app.use("/api/finance", financeRoutes);
+
+const buildingRoutes = require("./routes/BuildingRoutes");
+app.use("/api/building", buildingRoutes);
+
+const industrialRoutes = require("./routes/IndustrialRoute");
+app.use("/api/industrial", industrialRoutes);
+
+const itRoutes = require("./routes/itRoutes");
+app.use("/api/it", itRoutes);
+
+const businessRoutes = require("./routes/BusinessRoutes");
+app.use("/api/accounts", businessRoutes);
+
+const salesRoutes = require("./routes/SalesRoutes");
+app.use("/api/sales", salesRoutes);
+
+app.get("/api/team-projects", async (req, res) => {
+  try {
+    const [rows] = await db.query(`
             SELECT 
                 p.project_id, 
                 p.project_name, 
@@ -44,22 +70,22 @@ app.get('/api/team-projects', async (req, res) => {
             ORDER BY p.start_date DESC
         `);
 
-        // Categorize the data for the frontend
-        const categories = {
-            not_assigned: rows.filter(p => !p.assign_to_id),
-            not_started: rows.filter(p => p.assign_to_id && p.progress === 0),
-            newly_started: rows.filter(p => p.progress > 0 && p.progress <= 20)
-        };
+    // Categorize the data for the frontend
+    const categories = {
+      not_assigned: rows.filter((p) => !p.assign_to_id),
+      not_started: rows.filter((p) => p.assign_to_id && p.progress === 0),
+      newly_started: rows.filter((p) => p.progress > 0 && p.progress <= 20),
+    };
 
-        res.json(categories);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    res.json(categories);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 // ... existing imports and DB config
-app.get('/api/detailed-projects', async (req, res) => {
-    try {
-        const [rows] = await db.query(`
+app.get("/api/detailed-projects", async (req, res) => {
+  try {
+    const [rows] = await db.query(`
             SELECT 
                 p.*, 
                 p.end_date as estimated_date,
@@ -92,19 +118,27 @@ app.get('/api/detailed-projects', async (req, res) => {
             ORDER BY p.start_date DESC
         `);
 
-        const formattedRows = rows.map(row => {
-            const cleanEPT = row.EPT ? parseFloat(row.EPT.toString().replace(/[^\d.]/g, '')) : 0;
-            return {
-                ...row,
-                estimated_hours: cleanEPT,
-                contributors: typeof row.contributors === 'string' ? JSON.parse(row.contributors) : (row.contributors || [])
-            };
-        });
-        res.json(formattedRows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    const formattedRows = rows.map((row) => {
+      const cleanEPT = row.EPT
+        ? parseFloat(row.EPT.toString().replace(/[^\d.]/g, ""))
+        : 0;
+      return {
+        ...row,
+        estimated_hours: cleanEPT,
+        contributors:
+          typeof row.contributors === "string"
+            ? JSON.parse(row.contributors)
+            : row.contributors || [],
+      };
+    });
+    res.json(formattedRows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-const PORT = 5001; // FIXED: Moved to 5001 to avoid macOS AirPlay conflict on 5000
-app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
+const PORT = 5000;
+app.listen(PORT, () =>
+  console.log(`Backend running on http://localhost:${PORT}`),
+);
+//C:\Users\shrey\Desktop\raeanaylytics\raeAnalytics\dashboard-backend\server.js

@@ -28,3 +28,4 @@ const SearchBar = ({ searchTerm, setSearchTerm }) => {
 };
 
 export default SearchBar;
+//C:\Users\shrey\Desktop\raeanaylytics\raeAnalytics\dashboard-frontend\src\components\SearchBar.jsx
